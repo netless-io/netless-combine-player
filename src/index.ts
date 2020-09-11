@@ -1,4 +1,4 @@
-import { Player } from "white-react-sdk";
+import { Player } from "white-web-sdk";
 import { VideoJsPlayer } from "video.js";
 
 export enum ControlStatus {

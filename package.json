@@ -32,6 +32,6 @@
     "webpack-cli": "^3.3.12",
     "webpack-merge": "^5.1.4",
     "webpack-node-externals": "^2.5.2",
-    "white-react-sdk": "^2.9.16"
+    "white-web-sdk": "^2.9.16"
   }
 }
