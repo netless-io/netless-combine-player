@@ -7,6 +7,7 @@ export enum ControlStatus {
     BUFFERING = "BUFFERING",
     PLAYING = "PLAYING",
     PAUSE = "PAUSE",
+    FAILED = "FAILED",
 }
 
 /**
@@ -90,7 +91,10 @@ export class CombinePlayer {
                         });
                     })
                     .catch((e) => {
-                        console.log(e);
+                        this.statusCallBack({
+                            status: ControlStatus.FAILED,
+                            reason: `videoder play fail. message: ${e.message}, stack: ${e.stack}`,
+                        });
                     });
             }
             return;
@@ -112,7 +116,6 @@ export class CombinePlayer {
         // 而进行 seek 时触发的事件为: seeked -> canplay
         // 取其交集，即: canplay
         this.videoder.on("canplay", () => {
-            console.log("canplay");
             // 如果是第一次触发 canplay，则跳过时间对齐。因为第一次的 canplay 是页面刚加载，videoder 刚自动缓存完毕
             // TODO: 这里用户不一定是第一次给我
             if (!this.isFirstCallCanplay) {
@@ -124,7 +127,6 @@ export class CombinePlayer {
         });
 
         this.videoder.on("play", () => {
-            console.log("play");
             this.videoderLastPlayStatus = "play";
 
             // 首次触发时先暂停 videoder，等待白板加载完毕，再由白板进行播放
@@ -137,7 +139,6 @@ export class CombinePlayer {
         });
 
         this.videoder.on("pause", () => {
-            console.log("pause");
             if (!this.dontSetVideoderStatusPause) {
                 this.videoderLastPlayStatus = "pause";
                 this.whiteboarder.pause();
@@ -147,7 +148,6 @@ export class CombinePlayer {
 
         // 当 video 在加载时，暂停白板
         this.videoder.on("waiting", () => {
-            console.log("waiting");
             this.whiteboarder.pause();
         });
     }
