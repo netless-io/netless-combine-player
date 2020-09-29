@@ -88,16 +88,16 @@ video player 和 whiteboard player 都是原子播放器。在本库中，它们
 
 ![](./assets/combine-yellow-graphics.png)
 
-1. ``to-play (3, 1)``：调用 ``video`` 的 ``play`` 方法。
-2. ``to-play (2, 4)``：调用 ``whiteboard`` 的 ``play`` 方法。
-3. ``pausing (4, 3)``：调用 ``whiteboard`` 的 ``pause`` 方法。
-4. ``pausing (3, 4)``：调用 ``video`` 的 ``pause`` 方法。
-5. ``ending (5, 3)``： 调用 ``whiteboard`` 的 ``pause`` 方法。
-6. ``ending (5, 4)``： 调用 ``whiteboard`` 的 ``pause`` 方法。
-7. ``ending (3, 5)``： 调用 ``video`` 的 ``pause`` 方法。
-8. ``ending (4, 5)``： 调用 ``video`` 的 ``pause`` 方法。
-9. ``mixed (4, 2)``：若来自 ``playing (4, 4)``，则调用 `whiteboard` 的 ``pause`` 方法「注-2」。其他情况调用 ``video`` 的 ``play`` 方法「注-1」。
-10. ``mixed (1, 3)``： 若来自 ``playing (4, 4)``，则调用 `video` 的 play 方法「注-3」。其他情况调用 ``whiteboard`` 的 ``play`` 方法「注-4」。
+1. ``to-play (1, 3)``：调用 ``video`` 的 ``play`` 方法。
+2. ``to-play (4, 2)``：调用 ``whiteboard`` 的 ``play`` 方法。
+3. ``pausing (3, 4)``：调用 ``whiteboard`` 的 ``pause`` 方法。
+4. ``pausing (4, 3)``：调用 ``video`` 的 ``pause`` 方法。
+5. ``ending (3, 5)``： 调用 ``whiteboard`` 的 ``pause`` 方法。
+6. ``ending (4, 5)``： 调用 ``whiteboard`` 的 ``pause`` 方法。
+7. ``ending (5, 3)``： 调用 ``video`` 的 ``pause`` 方法。
+8. ``ending (5, 4)``： 调用 ``video`` 的 ``pause`` 方法。
+9. ``mixed (2, 4)``：若来自 ``playing (4, 4)``，则调用 `whiteboard` 的 ``pause`` 方法「注-2」。其他情况调用 ``video`` 的 ``play`` 方法「注-1」。
+10. ``mixed (3, 1)``： 若来自 ``playing (4, 4)``，则调用 `video` 的 play 方法「注-3」。其他情况调用 ``whiteboard`` 的 ``play`` 方法「注-4」。
 
 ### 被动事件 ``start-buffering``
 
