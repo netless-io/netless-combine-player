@@ -18,11 +18,11 @@ video player 和 whiteboard player 都是原子播放器。在本库中，它们
 | :---------------- | :------------------------ |
 | pause             | 暂停，但缓存足够，随时可以播放 |
 | pause-buffering   | 暂停，但缓存不足以立即播放    |
+| pause-seeking | 跳转中，完成跳转后，保留暂停状态 |
 | playing           | 正在播放，缓存充足           |
 | playing-buffering | 正在缓存，但缓存完后会立即播放 |
+| playing-seeking | 跳转中，完成跳转后，保留播放状态 |
 | ended             | 播放完全部内容              |
-
-> 播放器可以拆出 ``seeking`` 状态，这种状态用于表示正在跳转。但这里我们不区分这种状态，将其归于 ``pause-buffering`` 和 ``playing-buffering``。
 
 ### 事件描述
 
@@ -36,18 +36,11 @@ video player 和 whiteboard player 都是原子播放器。在本库中，它们
 | :----------------- | :------------------------ |
 | start-buffering    | 缓存区不足，开始缓存         |
 | complete-buffering | 缓存区足够，停止缓存         |
-| touch-end          | 已播完所有内容              |
+| complete-seeking | 完成跳转 |
+| touch-end          | 到达末尾，再无内容可播 |
 | call-play          | 用户调用「播放」操作         |
 | call-pause         | 用户调用「暂停」操作         |
 | call-seek          | 用户调用「跳转」操作         |
-
-### 关于跳转（``call-seek``）
-
-跳转的情况比较特殊。当播放器处于蓝色或绿色的状态时，直接调用 ``seek`` 操作即可。此时播放器应该会自动跳转到 ``playing-buffering`` 或 ``pause-buffering`` 之下。
-
-但状态为 ``ended`` 的时候比较特殊。此时用户可以调用 ``pause`` 来暂停，如果此时再调用 ``seek``，则播放器应该进入 ``pause-buffering`` 状态。如果用户没有调用过 ``pause``，然后调用 ``seek``，此时应该进入 ``pause-buffering``。
-
-我们在状态机图中，直接画出两条 ``call-seek`` 的线，可以视为将这个概念稍微封装了一下。
 
 ## 组合播放器状态机
 
@@ -69,7 +62,6 @@ video player 和 whiteboard player 都是原子播放器。在本库中，它们
 - **绿色**：播放器暂停，可以接受用户的「播放」操作。
 - **粉红**：内容已播完。
 - **黄色**：瞬时状态。进入该状态后，会立即操作某个原子播放器，从而立即脱离该状态。
-- **白色**：瞬时状态。与黄色不同，它不会做任何操作。但设计上，进入该状态后应该立即脱离该状态。
 - **黑色**：非法状态。不可能进入的状态（如果进入，程序肯定出了问题）。
 
 ### 设计目标
@@ -86,81 +78,65 @@ video player 和 whiteboard player 都是原子播放器。在本库中，它们
 
 当状态改变成黄色格子对应的状态时，会立即调用某个原子播放器的某个方法，从而脱离该状态。具体如何调用，每个黄色格子各有各的不同。
 
-![](./assets/combine-yellow-graphics.png)
+![](./assets/yellow-graphics.png)
 
-1. ``to-play (3, 1)``：调用 ``video`` 的 ``play`` 方法。
-2. ``to-play (2, 4)``：调用 ``whiteboard`` 的 ``play`` 方法。
-3. ``pausing (4, 3)``：调用 ``whiteboard`` 的 ``pause`` 方法。
-4. ``pausing (3, 4)``：调用 ``video`` 的 ``pause`` 方法。
-5. ``ending (5, 3)``： 调用 ``whiteboard`` 的 ``pause`` 方法。
-6. ``ending (5, 4)``： 调用 ``whiteboard`` 的 ``pause`` 方法。
-7. ``ending (3, 5)``： 调用 ``video`` 的 ``pause`` 方法。
-8. ``ending (4, 5)``： 调用 ``video`` 的 ``pause`` 方法。
-9. ``mixed (4, 2)``：若来自 ``playing (4, 4)``，则调用 `whiteboard` 的 ``pause`` 方法「注-2」。其他情况调用 ``video`` 的 ``play`` 方法「注-1」。
-10. ``mixed (1, 3)``： 若来自 ``playing (4, 4)``，则调用 `video` 的 play 方法「注-3」。其他情况调用 ``whiteboard`` 的 ``play`` 方法「注-4」。
+1. ``to-play (5, 2)`` 调用 ``whiteboard`` 的 ``play`` 方法。
+2. ``to-play (2, 5)`` 调用 ``video`` 的 ``play`` 方法。
+3. ``to-pause (5, 4)`` 调用 ``video`` 的 ``pause`` 方法。
+4. ``to-pause (4, 5)`` 调用 ``whiteboard`` 的 ``pause`` 方法。
+5. ``to-pause (5, 6)`` 调用 ``video`` 的 ``pause`` 方法。
+6. ``to-pause (6, 5)`` 调用 ``whiteboard`` 的 ``pause`` 方法。
+7. ``to-pause (5, 7)`` 调用 ``video`` 的 ``pause`` 方法。
+8. ``to-pause (7, 5)`` 调用 ``whiteboard`` 的 ``pause`` 方法。
 
-### 被动事件 ``start-buffering``
+## 播放与暂停操作
 
-该事件发生在某个原子播放器缓存区不够，或被调用 ``seek`` 方法之后。这会令该原子播放器从 ``playing`` 进入 ``playing-buffering``，或从 ``pause`` 进入 ``pause-buffering``。
+![](./assets/call-play.png)
 
-![](./assets/combine-start-buffering.png)
+![](./assets/call-pause.png)
 
-上图用橙色箭头列出了所有 ``start-buffering`` 可能导致的状态变化（但排除了从瞬间状态开始的情况）。黑色箭头表示，如果立即跳入了黄色格子，会被引导到哪个状态。
+对于 ``call-play`` 和 ``call-pause`` 事件，应该被封装成调用特定原子播放器的 ``play`` 或 ``pause`` 方法来实现。可以通过原子状态机的行为预测，组合状态机的状态会做如图跳转。
 
-### 被动事件 ``complete-buffering``
+> 在跳转过程中，由于原子状态机的状态不会同时变化，因此可能出现不符合预期的中间状态。这对于图中走斜线（而非纵向、横向）的箭头而言，是一定会出现。在这里必须用到一些编码技巧，隐藏这个中间状态。
 
-该事件发生在某个原子播放器缓存到了足够多的数据之后。这会令该原子播放器从 ``playing-buffering`` 进入 ``playing``，或从 ``pause-buffering`` 进入 ``pause``。
+- **注(1)**：当组合播放器第一次调 ``call-play`` 时，必须调用 ``video`` 的 ``play`` 方法，以激活它。否则，因为浏览器的安全机制的限制，之后调用 ``video`` 的 ``play`` 方法时浏览器会报错。该箭头表明，此时只会调用 ``whiteboard`` 的 ``play`` 方法，这显然是有隐患的。这里，如果发现 ``video`` 的 ``play`` 方法从未被调用，应该立即对 ``video`` 调用 ``play``，然后紧接着立即调用 ``pause``，最后再对 ``whiteboard`` 调用 ``play``。
 
-![](./assets/combine-complete-buffering.png)
+## 跳转中的事件
 
-上图用橙色箭头列出了所有 ``complete-buffering`` 可能导致的状态变化（但排除了从瞬间状态开始的情况）。黑色箭头表示，如果立即跳入了黄色格子，会被引导到哪个状态。
+当用户对组合播放器调用 ``seek`` 方法时，应该封装成对原子播放器的 ``seek`` 调用。
 
-### 被动事件 ``touch-end``
+![](./assets/call-seek.png)
 
-该事件发生在某个原子播放器已经播完了全部内容。这会令该原子播放器从 ``playing`` 进入 ``ended``。
+- **注(1)**：这两个斜向箭头中，一个原子播放器的状态是 ``pause``，另一个是 ``playing-buffering``。这让状态为 ``pause`` 的播放器不可能一步跳转到 ``playing-seeking`` 的状态（观察状态机图，的确无法一步至此）。此时需要对他连续调用 ``seek`` 和 ``play`` 方法，才能达到目标状态。
 
-![](./assets/combine-touch-end.png)
+此外，若组合状态机处于 ``playing-seeking`` 时，调用 ``pause`` 方法，需要进行如下图条状。
 
-上图用橙色箭头列出了所有 ``touch-end`` 可能导致的状态变化（但排除了从瞬间状态开始的情况）。黑色箭头表示，如果立即跳入了黄色格子，会被引导到哪个状态。
+![](./assets/call-pause-when-seek.png)
 
-### 主动事件 ``call-play``
+此外，若组合状态机处于 ``pause-seeking`` 时，调用 ``play`` 方法，需要进行如下图条状。
 
-当用户调用组合播放器的 ``play`` 方法后，如果当前状态格子为绿色，根据所在格子的不同，调用特定原子播放器的 ``play`` 方法。如果格子是蓝色，则拒绝该操作。
+![](./assets/call-play-when-seek.png)
 
-![](./assets/combine-call-play.png)
+### 被动事件
 
-上图用橙色箭头列出了所有 ``call-play`` 可能导致的状态变化（但排除了从瞬间状态开始的情况）。黑色箭头表示，如果立即跳入了黄色格子，会被引导到哪个状态。
+某个原子播放器接收到 ``start-buffering`` 事件。
 
-### 主动事件 ``call-pause``
+![](./assets/start-buffering.png)
 
-当用户调用组合播放器的 ``pause`` 方法后，如果当前状态格子为绿色，根据所在格子的不同，调用特定原子播放器的 ``pause`` 方法。如果格子是蓝色，则拒绝该操作。
+某个原子播放器接收到 ``complete-buffering`` 的情况。
 
-![](./assets/combine-call-pause.png)
+![](./assets/complete-buffering.png)
 
-上图用橙色箭头列出了所有 ``call-pause`` 可能导致的状态变化（但排除了从瞬间状态开始的情况）。黑色箭头表示，如果立即跳入了黄色格子，会被引导到哪个状态。
+某个原子播放器接收到 ``complete-seeking`` 的情况。
 
-### 主动事件 ``call-seek``
+![](./assets/complete-seeking.png)
 
-当用户调用组合播放器的 ``seek`` 方法后，如果当前状态格子为粉红，根据所在格子的不同，调用特定原子播放器的 ``pause`` 方法。``call-seek`` 有两种，根据封装逻辑，决定是跳转到 ``pause-buffering`` 还是 ``playing-buffering``。
+某个原子播放器接收到 ``touch-end`` 的情况。
 
-![](./assets/combine-call-seek.png)
+![](./assets/touch-end.png)
 
-上图用橙色箭头列出了所有 ``call-seek`` 可能导致的状态变化（但排除了从瞬间状态开始的情况）。黑色箭头表示，如果立即跳入了黄色格子，会被引导到哪个状态。
+## 被动事件查漏补缺
 
-### 黄色格子的异常流程
+如下图列出了所有被动事件会引发的状态变化，以及因为跳转到黄色格子而导致的操作。被动事件随时随地可能会发生，我们穷举出所有可能的被动事件，并预测它可能带来的影响。通过如下图，我们可以论证说，我们的组合状态机是符合预期的。
 
-考虑到被动事件随时随地可能发生，下图中，用橙色和粉色标出了所有被动事件可能导致的格子状态的走向。
-
-![](./assets/combine-exception-graphics.png)
-
-我们定义黄色格子是瞬时状态，因为一旦进入黄色格子，立即有一个原子播放器会被调用方法，从而，组合状态机从该格子的状态中脱离（走黑色的箭头路径）。
-
-但在极端情况下，即便只是一瞬间，组合状态机处于黄色格子时依然接受到了被动事件，从而走向了意想不到的格子（橙色或粉色箭头的路径）。我们需要一一排查这些情况，确保这些情况不会导致不符合预期的情况。
-
-值得注意的是，由于进入黄色格子时，某个原子播放器会被调用方法，因此该播放器不会再接受到被动事件，即便接受，也必须等到脱离这个黄色格子时才能接受，这是由播放器状态的一致性保证的。但这种一致性仅限于单个原子播放器内部，该播放器之外的原子播放器不受此一致性的约束。
-
-对此，我们可以得到一个推论：被调用方法的原子播放器的被动事件在脱离该格子前是不会发生的，这些事件我们用粉色标记。没有被调用方法的原子播放器的被动事件是可能发生的，这些事件我们用橙色标记。
-
-最终，还可以得出进一步的推论：粉色箭头的路径是不可能的，可以排除，橙色箭头的路径是可能的，必须考虑在内。
-
-**通过一个一个排查所有橙色箭头可能的路径，我们发现这张图没有不符合预期的地方，我们说，这张图是完备的。**
+![](./assets/all.png)
