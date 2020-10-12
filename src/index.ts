@@ -190,6 +190,7 @@ export default class CombinePlayer {
         this.videoJS!.on(
             "waiting",
             warp(() => {
+                this.stateMachine.emit("video", Status.PlayingBuffering);
                 // 这里进行提前通知，因为如果放在 taskQueue 里时，无法保证用户能第一时间感知到当前视频处于 playing-buffering 状态
                 this.statusCallBack(CombineStatus.PlayingBuffering);
                 this.taskQueue.add(next => this.$pauseWhiteboarderByVideoWaiting(next));
@@ -224,6 +225,7 @@ export default class CombinePlayer {
         this.whiteboarderEventEmitter.addListener(
             "buffering",
             warp(() => {
+                this.stateMachine.emit("whiteboarder", Status.PlayingBuffering);
                 this.statusCallBack(CombineStatus.PlayingBuffering);
                 this.taskQueue.add(next => this.$pauseVideoByWhiteboarderBuffering(next));
                 this.taskQueue.add(next => this.$setTriggerSource(next, "none"));
@@ -598,6 +600,11 @@ export default class CombinePlayer {
         this.videoJS!.pause();
     }
 
+    /**
+     * 当 whiteboarder 为 buffering 时，插件自动调用 video 的 暂停方法
+     * @param next
+     * @private
+     */
     private $pauseVideoByWhiteboarderBuffering(next: AnyFunction): void {
         // 当 video 处于 pause 状态时，再次调用 pause 方法时，是不会触发 pause 事件的。所以需要提前进行判断。
         if (this.videoJS!.paused()) {
@@ -613,20 +620,36 @@ export default class CombinePlayer {
         this.videoJS!.pause();
     }
 
+    /**
+     * 当 whiteboarder 为 playing 时，插件自动调用 video 的播放方法
+     * @param {AnyFunction} next - 完成，开始下一个
+     * @private
+     */
     private $playingVideoByWhiteboarderPlaying(next: AnyFunction): void {
-        this.stateMachine.one(CombineStatus.Pause, (_last, _current, done) => {
-            this.play();
+        this.stateMachine.one(CombineStatus.ToPlay, (_last, _current, done) => {
+            this.videoJS!.play();
+            done();
+        });
+
+        this.stateMachine.one(CombineStatus.Playing, (_last, _current, done) => {
+            this.statusCallBack(CombineStatus.Playing);
             done();
             next();
         });
 
-        this.whiteboarderEventEmitter.one("pause", () => {
-            this.stateMachine.emit("whiteboarder", Status.Pause);
+        this.videoJS!.one("playing", () => {
+            this.stateMachine.emit("video", Status.Playing);
         });
 
-        this.whiteboarder!.pause();
+        this.stateMachine.emit("whiteboarder", Status.Playing);
     }
 
+    /**
+     * 改变 修改源
+     * @param {AnyFunction} next - 完成，开始下一个
+     * @param {TriggerSource} source - 修改源
+     * @private
+     */
     private $setTriggerSource(next: AnyFunction, source: TriggerSource): void {
         this.triggerSource = source;
         next();
