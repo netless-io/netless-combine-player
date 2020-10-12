@@ -19,7 +19,7 @@ const baseStatusData = {
     lastIndex: NaN,
 };
 
-const emptyFnHandler = (_last: Mixing, _current: Mixing, done: EmptyCallback) => {
+const emptyFnHandler = (_last: Mixing, _current: Mixing, done: EmptyCallback): void => {
     done();
 };
 
@@ -269,7 +269,7 @@ export class StateMachine {
             videoIndex: number,
         ): { name: CombineStatus; event: EmptyCallback } => ({
             name: status,
-            event: () => {
+            event: (): void => {
                 const last = {
                     whiteboarderStatus: this.getStatus("whiteboarder").last,
                     videoStatus: this.getStatus("video").last,
@@ -295,7 +295,7 @@ export class StateMachine {
                     };
                 }
 
-                handler(last, current, () => this.setLastIndex(whiteboarderIndex, videoIndex));
+                handler(last, current, (): void => this.setLastIndex(whiteboarderIndex, videoIndex));
             },
         });
     }
