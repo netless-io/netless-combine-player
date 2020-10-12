@@ -7,3 +7,5 @@ export const ACCIDENT_ENTERED_DISABLED_BY_WHITEBOARDER_IS_PAUSE_BUFFERING =
     "When the whiteboarder is PauseBuffering, accidentally enters the prohibited area";
 export const ACCIDENT_ENTERED_DISABLED_BY_ALL_IS_PAUSE_BUFFERING =
     "When video and whiteboarder are PauseBuffering, they accidentally enter the prohibited area";
+export const ACCIDENT_ENTERED_DISABLED_BY_PLAYING =
+    "When video and whiteboarder are PauseBuffering, they accidentally enter the prohibited area";

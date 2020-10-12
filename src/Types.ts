@@ -44,4 +44,4 @@ export type LockStatus = {
     unLockStatusList: CombineStatus[];
 }
 
-export type TriggerSource = "none" | "video" | "whiteboarder" | "manual";
+export type TriggerSource = "none" | "video" | "whiteboarder" | "plugin";
