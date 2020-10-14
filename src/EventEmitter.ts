@@ -38,7 +38,7 @@ export class EventEmitter {
         this.listeners[eventName] = currentListener.filter(listener => {
             // realCallbackFn 的作用是，once 还没有运行时如果取消了，则要做出相应的处理
             // @ts-ignore
-            return listener !== cb && listener !== listener.realCallbackFn;
+            return listener !== cb && cb !== listener.realCallbackFn;
         });
     }
 
