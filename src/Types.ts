@@ -1,5 +1,5 @@
 import { VideoJsPlayerOptions } from "video.js";
-import { CombineStatus, Status } from './StatusContant';
+import { CombineStatus, Status } from "./StatusContant";
 
 export interface VideoOptions extends DefaultOptions {
     url: string;
@@ -42,6 +42,6 @@ export type LockStatus = {
     status: boolean;
     allowStatusList: CombineStatus[];
     unLockStatusList: CombineStatus[];
-}
+};
 
 export type TriggerSource = "none" | "video" | "whiteboarder" | "plugin";

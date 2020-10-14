@@ -74,7 +74,7 @@ export class StateMachine {
     /**
      * 监听组合状态变更回调，只运行一次
      * @param {CombineStatus} eventName - 需要监听的组合状态名
-     * @param {onEventCallback} cb - 事件回调
+     * @param {OnEventCallback} cb - 事件回调
      */
     public one(eventName: CombineStatus, cb: OnEventCallback): void {
         this.events[eventName] = {
@@ -97,13 +97,22 @@ export class StateMachine {
 
     /**
      * 解除监听器
-     * @param {CombineStatus} eventName - 需要取消监听的组合状态名
+     * @param {CombineStatus | CombineStatus[]} eventName - 需要取消监听的组合状态名
      */
-    public un(eventName: CombineStatus): void {
-        this.events[eventName] = {
-            handler: emptyFnHandler,
-            once: false,
-        };
+    public off(eventName: CombineStatus | CombineStatus[]): void {
+        if (typeof eventName === "string") {
+            this.events[eventName] = {
+                handler: emptyFnHandler,
+                once: false,
+            };
+        } else {
+            for (let i = 0; i < eventName.length; i++) {
+                this.events[eventName[i]] = {
+                    handler: emptyFnHandler,
+                    once: false,
+                };
+            }
+        }
     }
 
     /**
@@ -295,7 +304,9 @@ export class StateMachine {
                     };
                 }
 
-                handler(last, current, (): void => this.setLastIndex(whiteboarderIndex, videoIndex));
+                handler(last, current, (): void =>
+                    this.setLastIndex(whiteboarderIndex, videoIndex),
+                );
             },
         });
     }

@@ -42,15 +42,6 @@ export class EventEmitter {
         });
     }
 
-    public removeAllListener(eventName: string): void {
-        const currentListener = this.getEvent(eventName);
-        if (!currentListener) {
-            return;
-        }
-
-        delete this.listeners[eventName];
-    }
-
     public one(eventName: string, cb: AnyFunction): void {
         if (isNotFn(cb)) {
             return;

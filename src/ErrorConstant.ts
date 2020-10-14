@@ -9,3 +9,9 @@ export const ACCIDENT_ENTERED_DISABLED_BY_ALL_IS_PAUSE_BUFFERING =
     "When video and whiteboarder are PauseBuffering, they accidentally enter the prohibited area";
 export const ACCIDENT_ENTERED_DISABLED_BY_PLAYING =
     "When video and whiteboarder are PauseBuffering, they accidentally enter the prohibited area";
+export const ACCIDENT_ENTERED_DISABLED_BY_SEEKING_PLAYING =
+    "When video and whiteboarder are playing, perform seek operation and accidentally enter the prohibited area";
+export const ACCIDENT_ENTERED_DISABLED_BY_SEEKING_PAUSE =
+    "When video and whiteboarder are pause, perform seek operation and accidentally enter the prohibited area";
+export const ACCIDENT_ENTERED_DISABLED_BY_ENDED =
+    "When video or whiteboarder are Eeded, they accidentally enter the prohibited area";
