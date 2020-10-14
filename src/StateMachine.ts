@@ -1,6 +1,13 @@
 import { debugLog } from "./Log";
 import { Status } from "./StatusContant";
-import { EventList, EmptyCallback, OnEventCallback, Mixing, LockStatus } from "./Types";
+import {
+    EventList,
+    EmptyCallback,
+    OnEventCallback,
+    Mixing,
+    LockStatus,
+    BaseStatusData,
+} from "./Types";
 import { CombineStatus } from "./StatusContant";
 
 // 共同的状态
@@ -41,11 +48,11 @@ const defaultCombineStatusHandler = (): EventList => {
 };
 
 export class StateMachine {
-    private videoStatus = {
+    private videoStatus: BaseStatusData = {
         ...baseStatusData,
     };
 
-    private whiteboardStatus = {
+    private whiteboardStatus: BaseStatusData = {
         ...baseStatusData,
     };
 
@@ -55,9 +62,9 @@ export class StateMachine {
         unLockStatusList: [],
     };
 
-    private events = defaultCombineStatusHandler();
+    private events: EventList = defaultCombineStatusHandler();
 
-    private table = this.initTables();
+    private table: { name: CombineStatus; event: EmptyCallback }[][] = this.initTables();
 
     private readonly debug: (...args: any[]) => void = () => {};
 

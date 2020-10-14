@@ -50,15 +50,15 @@ export default class CombinePlayer {
 
     private triggerSource: TriggerSource = "none";
 
-    private readonly whiteboardEventEmitter = new EventEmitter();
-    private readonly taskQueue = new TaskQueue();
+    private readonly whiteboardEventEmitter: EventEmitter = new EventEmitter();
+    private readonly taskQueue: TaskQueue = new TaskQueue();
 
     /**
      * 实例化 Combine-Player 插件
      * @param {VideoOptions} [videoOptions=DefaultOptions] - video 配置项
      * @param {boolean} [debug=false] - 是否开启 debug 日志
      */
-    public constructor(videoOptions: VideoOptions, debug = false) {
+    public constructor(videoOptions: VideoOptions, debug: boolean = false) {
         verifyInstanceParams(videoOptions);
 
         const _defaultOptions = defaultOptions();

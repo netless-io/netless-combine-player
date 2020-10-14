@@ -47,7 +47,7 @@ export class EventEmitter {
             return;
         }
 
-        const wrap = (...arg: any[]) => {
+        const wrap = (...arg: any[]): void => {
             cb(...arg);
             this.removeListener(eventName, wrap);
         };

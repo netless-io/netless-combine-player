@@ -71,7 +71,15 @@ module.exports = {
             "error",
             "always",
         ],
-        "@typescript-eslint/explicit-module-boundary-types": "off",
+        "@typescript-eslint/typedef": [
+            "error",
+            {
+                parameter: true,
+                memberVariableDeclaration: true,
+            },
+        ],
+        "@typescript-eslint/explicit-function-return-type": ["error"],
+        "@typescript-eslint/explicit-module-boundary-types": ["error"],
         "@typescript-eslint/ban-ts-comment": "off",
         "@typescript-eslint/no-unsafe-call": "off",
         "@typescript-eslint/no-unsafe-return": "off",
@@ -86,5 +94,6 @@ module.exports = {
         "@typescript-eslint/no-empty-function": "off",
         "@typescript-eslint/no-floating-promises": "off",
         "@typescript-eslint/no-non-null-assertion": "off",
+        "@typescript-eslint/no-inferrable-types": "off",
     },
 };

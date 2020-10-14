@@ -45,3 +45,9 @@ export type LockStatus = {
 };
 
 export type TriggerSource = "none" | "video" | "whiteboard" | "plugin";
+
+export type BaseStatusData = {
+    status: readonly Status[];
+    currentIndex: number;
+    lastIndex: number;
+};
