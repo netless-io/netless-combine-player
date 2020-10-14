@@ -45,7 +45,7 @@ export class StateMachine {
         ...baseStatusData,
     };
 
-    private whiteboarderStatus = {
+    private whiteboardStatus = {
         ...baseStatusData,
     };
 
@@ -117,10 +117,10 @@ export class StateMachine {
 
     /**
      * 通知状态变更
-     * @param {"video" | "whiteboarder"} source - 需要更改哪端的状态
+     * @param {"video" | "whiteboard"} source - 需要更改哪端的状态
      * @param {Status} event - 即将要更改的状态名
      */
-    public emit(source: "video" | "whiteboarder", event: Status): void {
+    public emit(source: "video" | "whiteboard", event: Status): void {
         const index = baseStatus.indexOf(event) + 1;
         if (source === "video") {
             if (this.videoStatus.currentIndex === index) {
@@ -135,25 +135,25 @@ export class StateMachine {
                 this.videoStatus.status[this.videoStatus.currentIndex - 1],
             );
         } else {
-            if (this.whiteboarderStatus.currentIndex === index) {
+            if (this.whiteboardStatus.currentIndex === index) {
                 return;
             }
 
-            this.whiteboarderStatus.currentIndex = index;
+            this.whiteboardStatus.currentIndex = index;
 
             this.debug(
                 "Single",
-                "Whiteboarder",
-                this.whiteboarderStatus.status[this.whiteboarderStatus.currentIndex - 1],
+                "Whiteboard",
+                this.whiteboardStatus.status[this.whiteboardStatus.currentIndex - 1],
             );
         }
 
         // 只要有一个为 NaN 则不做任何处理
-        if (isNaN(this.whiteboarderStatus.currentIndex) || isNaN(this.videoStatus.currentIndex)) {
+        if (isNaN(this.whiteboardStatus.currentIndex) || isNaN(this.videoStatus.currentIndex)) {
             return;
         }
 
-        const combineStatus = this.table[this.whiteboarderStatus.currentIndex - 1][
+        const combineStatus = this.table[this.whiteboardStatus.currentIndex - 1][
             this.videoStatus.currentIndex - 1
         ];
 
@@ -210,19 +210,19 @@ export class StateMachine {
     } {
         const { lastIndex: videoLastIndex, currentIndex: videoCurrentIndex } = this.videoStatus;
         const {
-            lastIndex: whiteboarderLastIndex,
-            currentIndex: whiteboarderCurrentIndex,
-        } = this.whiteboarderStatus;
+            lastIndex: whiteboardLastIndex,
+            currentIndex: whiteboardCurrentIndex,
+        } = this.whiteboardStatus;
 
         let last: CombineStatus | undefined = undefined;
         let current: CombineStatus | undefined = undefined;
 
-        if (!isNaN(videoLastIndex) && !isNaN(whiteboarderLastIndex)) {
-            last = this.table[videoLastIndex - 1][whiteboarderLastIndex - 1].name;
+        if (!isNaN(videoLastIndex) && !isNaN(whiteboardLastIndex)) {
+            last = this.table[videoLastIndex - 1][whiteboardLastIndex - 1].name;
         }
 
-        if (!isNaN(videoCurrentIndex) && !isNaN(whiteboarderCurrentIndex)) {
-            current = this.table[videoCurrentIndex - 1][whiteboarderCurrentIndex - 1].name;
+        if (!isNaN(videoCurrentIndex) && !isNaN(whiteboardCurrentIndex)) {
+            current = this.table[videoCurrentIndex - 1][whiteboardCurrentIndex - 1].name;
         }
 
         return {
@@ -233,10 +233,10 @@ export class StateMachine {
 
     /**
      * 获取端状态
-     * @param {"video" | "whiteboarder"} source - 要查看的端
+     * @param {"video" | "whiteboard"} source - 要查看的端
      */
     public getStatus(
-        source: "video" | "whiteboarder",
+        source: "video" | "whiteboard",
     ): {
         last: Status;
         current: Status;
@@ -248,22 +248,22 @@ export class StateMachine {
                 current: this.videoStatus.status[currentIndex - 1],
             };
         } else {
-            const { lastIndex, currentIndex } = this.whiteboarderStatus;
+            const { lastIndex, currentIndex } = this.whiteboardStatus;
             return {
-                last: this.whiteboarderStatus.status[lastIndex - 1],
-                current: this.whiteboarderStatus.status[currentIndex - 1],
+                last: this.whiteboardStatus.status[lastIndex - 1],
+                current: this.whiteboardStatus.status[currentIndex - 1],
             };
         }
     }
 
     /**
      * 设置上一次的状态下标
-     * @param {number} whiteboarderIndex - 回放的状态下标
+     * @param {number} whiteboardIndex - 回放的状态下标
      * @param {number} videoIndex - videoJS 的状态下标
      * @private
      */
-    private setLastIndex(whiteboarderIndex: number, videoIndex: number): void {
-        this.whiteboarderStatus.lastIndex = whiteboarderIndex;
+    private setLastIndex(whiteboardIndex: number, videoIndex: number): void {
+        this.whiteboardStatus.lastIndex = whiteboardIndex;
         this.videoStatus.lastIndex = videoIndex;
     }
 
@@ -274,18 +274,18 @@ export class StateMachine {
      */
     private generateEvent(status: CombineStatus) {
         return (
-            whiteboarderIndex: number,
+            whiteboardIndex: number,
             videoIndex: number,
         ): { name: CombineStatus; event: EmptyCallback } => ({
             name: status,
             event: (): void => {
                 const last = {
-                    whiteboarderStatus: this.getStatus("whiteboarder").last,
+                    whiteboardStatus: this.getStatus("whiteboard").last,
                     videoStatus: this.getStatus("video").last,
                 };
 
                 const current = {
-                    whiteboarderStatus: this.getStatus("whiteboarder").current,
+                    whiteboardStatus: this.getStatus("whiteboard").current,
                     videoStatus: this.getStatus("video").current,
                 };
 
@@ -304,9 +304,7 @@ export class StateMachine {
                     };
                 }
 
-                handler(last, current, (): void =>
-                    this.setLastIndex(whiteboarderIndex, videoIndex),
-                );
+                handler(last, current, (): void => this.setLastIndex(whiteboardIndex, videoIndex));
             },
         });
     }
