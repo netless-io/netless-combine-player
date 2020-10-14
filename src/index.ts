@@ -144,15 +144,19 @@ export default class CombinePlayer {
     public play(): void {
         this.taskQueue.add((next: AnyFunction): void => this.$setTriggerSource(next, "plugin"));
 
-        const currentCombinedStatus = this.stateMachine.getCombinationStatus().current;
+        this.taskQueue.add((next: AnyFunction): void => {
+            const currentCombinedStatus = this.stateMachine.getCombinationStatus().current;
 
-        if (currentCombinedStatus === CombineStatus.Pause) {
-            this.taskQueue.add((next: AnyFunction): void => this.$playByPause(next));
-        } else if (currentCombinedStatus === CombineStatus.PauseBuffering) {
-            this.taskQueue.add((next: AnyFunction): void => this.$playByPauseBuffering(next));
-        } else if (currentCombinedStatus === CombineStatus.Ended) {
-            this.taskQueue.add((next: AnyFunction): void => this.$playByEnded(next));
-        }
+            if (currentCombinedStatus === CombineStatus.Pause) {
+                this.$playByPause(next);
+            } else if (currentCombinedStatus === CombineStatus.PauseBuffering) {
+                this.$playByPauseBuffering(next);
+            } else if (currentCombinedStatus === CombineStatus.Ended) {
+                this.$playByEnded(next);
+            } else {
+                next();
+            }
+        });
 
         this.taskQueue.add((next: AnyFunction): void => this.$setTriggerSource(next, "none"));
     }
@@ -163,11 +167,14 @@ export default class CombinePlayer {
     public pause(): void {
         this.taskQueue.add((next: AnyFunction): void => this.$setTriggerSource(next, "plugin"));
 
-        const currentCombinedStatus = this.stateMachine.getCombinationStatus().current;
-
-        if (currentCombinedStatus === CombineStatus.Playing) {
-            this.taskQueue.add((next: AnyFunction): void => this.$pauseByPlaying(next));
-        }
+        this.taskQueue.add((next: AnyFunction): void => {
+            const currentCombinedStatus = this.stateMachine.getCombinationStatus().current;
+            if (currentCombinedStatus === CombineStatus.Playing) {
+                this.$pauseByPlaying(next);
+            } else {
+                next();
+            }
+        });
 
         this.taskQueue.add((next: AnyFunction): void => this.$setTriggerSource(next, "none"));
     }
@@ -178,17 +185,22 @@ export default class CombinePlayer {
     public seek(ms: number): void {
         this.taskQueue.add((next: AnyFunction): void => this.$setTriggerSource(next, "plugin"));
 
-        const currentCombinedStatus = this.stateMachine.getCombinationStatus().current;
+        this.taskQueue.add((next: AnyFunction): void => {
+            const currentCombinedStatus = this.stateMachine.getCombinationStatus()
+                .current as CombineStatus;
 
-        if (currentCombinedStatus === CombineStatus.Playing) {
-            this.taskQueue.add((next: AnyFunction): void => this.$seekByPlaying(next, ms));
-        } else if (currentCombinedStatus === CombineStatus.Pause) {
-            this.taskQueue.add((next: AnyFunction): void => this.$seekByPause(next, ms));
-        } else if (currentCombinedStatus === CombineStatus.PauseBuffering) {
-            this.taskQueue.add((next: AnyFunction): void => this.$seekByPause(next, ms));
-        } else if (currentCombinedStatus === CombineStatus.Ended) {
-            this.taskQueue.add((next: AnyFunction): void => this.$seekByPause(next, ms));
-        }
+            if (currentCombinedStatus === CombineStatus.Playing) {
+                this.$seekByPlaying(next, ms);
+            } else if (
+                [CombineStatus.Pause, CombineStatus.PauseBuffering, CombineStatus.Ended].includes(
+                    currentCombinedStatus,
+                )
+            ) {
+                this.$seekByPause(next, ms);
+            } else {
+                next();
+            }
+        });
 
         this.taskQueue.add((next: AnyFunction): void => this.$setTriggerSource(next, "none"));
     }
@@ -360,7 +372,7 @@ export default class CombinePlayer {
     private $playByPause(next: AnyFunction): void {
         this.stateMachine.lockStatus(
             [CombineStatus.Disabled, CombineStatus.ToPlay, CombineStatus.Playing],
-            [CombineStatus.Playing],
+            [CombineStatus.Playing, CombineStatus.Disabled],
         );
 
         const videoOnPlaying = (): void => {
