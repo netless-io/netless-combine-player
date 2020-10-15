@@ -25,23 +25,23 @@ const defaultCombineStatusHandler = (): EventList => {
 };
 
 export class StateMachine {
-    private videoStatus: StatusData = {
+    private readonly videoStatus: StatusData = {
         current: Status.PauseBuffering,
         previous: Status.PauseBuffering,
     };
 
-    private whiteboardStatus: StatusData = {
+    private readonly whiteboardStatus: StatusData = {
         current: Status.PauseBuffering,
         previous: Status.PauseBuffering,
     };
 
-    private lockInfo: LockStatus = {
+    private readonly lockInfo: LockStatus = {
         status: false,
         allowStatusList: [],
         unLockStatusList: [],
     };
 
-    private events: EventList = defaultCombineStatusHandler();
+    private readonly events: EventList = defaultCombineStatusHandler();
 
     private readonly table: { name: CombineStatus; event: EmptyCallback }[][];
 
