@@ -1,7 +1,17 @@
 import { debugLog } from "./Log";
-import { Source, Status, StatusIndex } from "./StatusContant";
-import { EventList, EmptyCallback, OnEventCallback, Mixing, LockStatus, StatusData } from "./Types";
-import { CombineStatus } from "./StatusContant";
+import { CombineStatus, Source, Status, StatusIndex } from "./StatusContant";
+import {
+    CombinationStatusData,
+    EmptyCallback,
+    EventData,
+    EventList,
+    GenerateEvent,
+    LockInfo,
+    Mixing,
+    OnEventCallback,
+    StatusData,
+    Table,
+} from "./Types";
 
 const emptyFnHandler = (_previous: Mixing, _current: Mixing, done: EmptyCallback): void => {
     done();
@@ -35,15 +45,15 @@ export class StateMachine {
         previous: Status.PauseBuffering,
     };
 
-    private readonly lockInfo: LockStatus = {
-        status: false,
+    private readonly statusLockInfo: LockInfo = {
+        isLocked: false,
         allowStatusList: [],
         unLockStatusList: [],
     };
 
     private readonly events: EventList = defaultCombineStatusHandler();
 
-    private readonly table: { name: CombineStatus; event: EmptyCallback }[][];
+    private readonly table: Readonly<Table>;
 
     private readonly debug: (...args: any[]) => void = () => {};
 
@@ -108,23 +118,26 @@ export class StateMachine {
      * @param {Source} source - 需要更改哪端的状态
      * @param {Status} status - 即将要更改的状态名
      */
-    public emit(source: Source, status: Status): void {
-        if (source === Source.Video) {
-            if (this.videoStatus.current === status) {
-                return;
-            }
+    public setStatus(source: Source, status: Status): void {
+        switch (source) {
+            case Source.Video:
+                if (this.videoStatus.current === status) {
+                    return;
+                }
 
-            this.videoStatus.current = status;
+                this.videoStatus.current = status;
 
-            this.debug("Single", "Video", status);
-        } else {
-            if (this.whiteboardStatus.current === status) {
-                return;
-            }
+                this.debug("Single", "Video", status);
+                break;
+            case Source.Whiteboard:
+                if (this.whiteboardStatus.current === status) {
+                    return;
+                }
 
-            this.whiteboardStatus.current = status;
+                this.whiteboardStatus.current = status;
 
-            this.debug("Single", "Whiteboard", status);
+                this.debug("Single", "Whiteboard", status);
+                break;
         }
 
         const whiteboardStatusIndex = StatusIndex[this.whiteboardStatus.current];
@@ -134,10 +147,10 @@ export class StateMachine {
 
         // 如果当前设置了 lock，则只有在 允许状态列表里，才会运行相关的组合状态回调
         // 当不在 解锁状态列表里，是不会运行任何的组合状态回调
-        if (this.lockInfo.status) {
-            if (this.lockInfo.allowStatusList.includes(combineStatus.name)) {
+        if (this.statusLockInfo.isLocked) {
+            if (this.statusLockInfo.allowStatusList.includes(combineStatus.name)) {
                 // 当符合条件时解锁
-                if (this.lockInfo.unLockStatusList.includes(combineStatus.name)) {
+                if (this.statusLockInfo.unLockStatusList.includes(combineStatus.name)) {
                     this.unLockStatus();
                 }
 
@@ -153,32 +166,32 @@ export class StateMachine {
      * @param {CombineStatus[]} allowStatusList - 允许进入的组合状态名列表
      * @param {CombineStatus[]} unLockStatusList - 解锁的组合状态名列表
      */
-    public lockStatus(allowStatusList: CombineStatus[], unLockStatusList: CombineStatus[]): void {
+    public lockCombineStatus(
+        allowStatusList: CombineStatus[],
+        unLockStatusList: CombineStatus[],
+    ): void {
         // 如果当前已经有锁，则跳过，不再进行设置
-        if (this.lockInfo.status) {
+        if (this.statusLockInfo.isLocked) {
             return;
         }
-        this.lockInfo.status = true;
-        this.lockInfo.allowStatusList = allowStatusList;
-        this.lockInfo.unLockStatusList = unLockStatusList;
+        this.statusLockInfo.isLocked = true;
+        this.statusLockInfo.allowStatusList = allowStatusList;
+        this.statusLockInfo.unLockStatusList = unLockStatusList;
     }
 
     /**
      * 关闭 状态锁
      */
     public unLockStatus(): void {
-        this.lockInfo.status = false;
-        this.lockInfo.allowStatusList = [];
-        this.lockInfo.unLockStatusList = [];
+        this.statusLockInfo.isLocked = false;
+        this.statusLockInfo.allowStatusList = [];
+        this.statusLockInfo.unLockStatusList = [];
     }
 
     /**
      * 获取组合状态
      */
-    public getCombinationStatus(): {
-        previous: CombineStatus;
-        current: CombineStatus;
-    } {
+    public getCombinationStatus(): CombinationStatusData {
         const { previous: videoPrevious, current: videoCurrent } = this.videoStatus;
         const { previous: whiteboardPrevious, current: whiteboardCurrent } = this.whiteboardStatus;
 
@@ -200,22 +213,18 @@ export class StateMachine {
      * 获取端状态
      * @param {Source} source - 要查看的端
      */
-    public getStatus(
-        source: Source,
-    ): {
-        previous: Status;
-        current: Status;
-    } {
-        if (source === Source.Video) {
-            return {
-                previous: this.videoStatus.previous,
-                current: this.videoStatus.current,
-            };
-        } else {
-            return {
-                previous: this.whiteboardStatus.previous,
-                current: this.whiteboardStatus.current,
-            };
+    public getStatus(source: Source): StatusData {
+        switch (source) {
+            case Source.Video:
+                return {
+                    previous: this.videoStatus.previous,
+                    current: this.videoStatus.current,
+                };
+            case Source.Whiteboard:
+                return {
+                    previous: this.whiteboardStatus.previous,
+                    current: this.whiteboardStatus.current,
+                };
         }
     }
 
@@ -225,7 +234,7 @@ export class StateMachine {
      * @param {Status} video - videoJS 的状态下标
      * @private
      */
-    private setPreviousIndex(whiteboard: Status, video: Status): void {
+    private setPreviousStatus(whiteboard: Status, video: Status): void {
         this.whiteboardStatus.previous = whiteboard;
         this.videoStatus.previous = video;
     }
@@ -235,19 +244,16 @@ export class StateMachine {
      * @param {CombineStatus} status - 需要生成的状态
      * @private
      */
-    private generateEvent(status: CombineStatus) {
-        return (
-            whiteboard: Status,
-            video: Status,
-        ): { name: CombineStatus; event: EmptyCallback } => ({
+    private generateEvent(status: CombineStatus): GenerateEvent {
+        return (whiteboard: Status, video: Status): EventData => ({
             name: status,
             event: (): void => {
-                const previous = {
+                const previous: Mixing = {
                     whiteboard: this.getStatus(Source.Whiteboard).previous,
                     video: this.getStatus(Source.Video).previous,
                 };
 
-                const current = {
+                const current: Mixing = {
                     whiteboard: this.getStatus(Source.Whiteboard).current,
                     video: this.getStatus(Source.Video).current,
                 };
@@ -267,7 +273,7 @@ export class StateMachine {
                     };
                 }
 
-                handler(previous, current, (): void => this.setPreviousIndex(whiteboard, video));
+                handler(previous, current, (): void => this.setPreviousStatus(whiteboard, video));
             },
         });
     }
@@ -276,7 +282,7 @@ export class StateMachine {
      * 初始化二维表格
      * @private
      */
-    private initTables(): { name: CombineStatus; event: EmptyCallback }[][] {
+    private initTables(): Readonly<Table> {
         const pauseSeeking = this.generateEvent(CombineStatus.PauseSeeking);
         const playingSeeking = this.generateEvent(CombineStatus.PlayingSeeking);
         const pauseBuffering = this.generateEvent(CombineStatus.PauseBuffering);
@@ -289,7 +295,7 @@ export class StateMachine {
         const ended = this.generateEvent(CombineStatus.Ended);
 
         // prettier-ignore
-        return [
+        const result = [
             [
                 pauseSeeking(Status.PauseSeeking, Status.PauseSeeking),
                 pauseSeeking(Status.PauseSeeking, Status.Pause),
@@ -355,5 +361,7 @@ export class StateMachine {
                 ended(Status.Ended, Status.Ended),
             ],
         ];
+
+        return Object.freeze(result);
     }
 }

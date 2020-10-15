@@ -38,8 +38,8 @@ export type PublicCombinedStatus =
     | CombineStatus.Ended
     | CombineStatus.Disabled;
 
-export type LockStatus = {
-    status: boolean;
+export type LockInfo = {
+    isLocked: boolean;
     allowStatusList: CombineStatus[];
     unLockStatusList: CombineStatus[];
 };
@@ -48,3 +48,17 @@ export type StatusData = {
     current: Status;
     previous: Status;
 };
+
+export type Table = { readonly name: CombineStatus; readonly event: EmptyCallback }[][];
+
+export type CombinationStatusData = {
+    previous: CombineStatus;
+    current: CombineStatus;
+};
+
+export type EventData = {
+    name: CombineStatus;
+    event: EmptyCallback;
+};
+
+export type GenerateEvent = (whiteboard: Status, video: Status) => EventData;
