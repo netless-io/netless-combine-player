@@ -1,5 +1,5 @@
 import { VideoJsPlayerOptions } from "video.js";
-import { CombineStatus, Status, StatusIndex } from "./StatusContant";
+import { CombineStatus, Status } from "./StatusContant";
 
 export interface VideoOptions extends DefaultOptions {
     url: string;
@@ -12,10 +12,10 @@ export interface DefaultOptions {
 }
 
 export type Mixing = {
-    whiteboard: Status | "";
-    video: Status | "";
+    whiteboard: Status;
+    video: Status;
 };
-export type OnEventCallback = (last: Mixing, current: Mixing, done: () => void) => any;
+export type OnEventCallback = (previous: Mixing, current: Mixing, done: () => void) => any;
 
 export type EventList = {
     -readonly [key in CombineStatus]: {
@@ -46,5 +46,5 @@ export type LockStatus = {
 
 export type StatusData = {
     current: Status;
-    last: Status;
+    previous: Status;
 };

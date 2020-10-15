@@ -3,7 +3,7 @@ import { Source, Status, StatusIndex } from "./StatusContant";
 import { EventList, EmptyCallback, OnEventCallback, Mixing, LockStatus, StatusData } from "./Types";
 import { CombineStatus } from "./StatusContant";
 
-const emptyFnHandler = (_last: Mixing, _current: Mixing, done: EmptyCallback): void => {
+const emptyFnHandler = (_previous: Mixing, _current: Mixing, done: EmptyCallback): void => {
     done();
 };
 
@@ -27,12 +27,12 @@ const defaultCombineStatusHandler = (): EventList => {
 export class StateMachine {
     private videoStatus: StatusData = {
         current: Status.PauseBuffering,
-        last: Status.PauseBuffering,
+        previous: Status.PauseBuffering,
     };
 
     private whiteboardStatus: StatusData = {
         current: Status.PauseBuffering,
-        last: Status.PauseBuffering,
+        previous: Status.PauseBuffering,
     };
 
     private lockInfo: LockStatus = {
@@ -176,22 +176,22 @@ export class StateMachine {
      * 获取组合状态
      */
     public getCombinationStatus(): {
-        last: CombineStatus;
+        previous: CombineStatus;
         current: CombineStatus;
     } {
-        const { last: videoLast, current: videoCurrent } = this.videoStatus;
-        const { last: whiteboardLast, current: whiteboardCurrent } = this.whiteboardStatus;
+        const { previous: videoPrevious, current: videoCurrent } = this.videoStatus;
+        const { previous: whiteboardPrevious, current: whiteboardCurrent } = this.whiteboardStatus;
 
-        const videoStatusLast = StatusIndex[videoLast];
-        const whiteboardStatusLast = StatusIndex[whiteboardLast];
+        const videoStatusPrevious = StatusIndex[videoPrevious];
+        const whiteboardStatusPrevious = StatusIndex[whiteboardPrevious];
         const videoStatusCurrent = StatusIndex[videoCurrent];
         const whiteboardStatusCurrent = StatusIndex[whiteboardCurrent];
 
-        const last = this.table[whiteboardStatusLast][videoStatusLast].name;
+        const previous = this.table[whiteboardStatusPrevious][videoStatusPrevious].name;
         const current = this.table[whiteboardStatusCurrent][videoStatusCurrent].name;
 
         return {
-            last,
+            previous,
             current,
         };
     }
@@ -203,17 +203,17 @@ export class StateMachine {
     public getStatus(
         source: Source,
     ): {
-        last: Status;
+        previous: Status;
         current: Status;
     } {
         if (source === Source.Video) {
             return {
-                last: this.videoStatus.last,
+                previous: this.videoStatus.previous,
                 current: this.videoStatus.current,
             };
         } else {
             return {
-                last: this.whiteboardStatus.last,
+                previous: this.whiteboardStatus.previous,
                 current: this.whiteboardStatus.current,
             };
         }
@@ -225,9 +225,9 @@ export class StateMachine {
      * @param {Status} video - videoJS 的状态下标
      * @private
      */
-    private setLastIndex(whiteboard: Status, video: Status): void {
-        this.whiteboardStatus.last = whiteboard;
-        this.videoStatus.last = video;
+    private setPreviousIndex(whiteboard: Status, video: Status): void {
+        this.whiteboardStatus.previous = whiteboard;
+        this.videoStatus.previous = video;
     }
 
     /**
@@ -242,9 +242,9 @@ export class StateMachine {
         ): { name: CombineStatus; event: EmptyCallback } => ({
             name: status,
             event: (): void => {
-                const last = {
-                    whiteboard: this.getStatus(Source.Whiteboard).last,
-                    video: this.getStatus(Source.Video).last,
+                const previous = {
+                    whiteboard: this.getStatus(Source.Whiteboard).previous,
+                    video: this.getStatus(Source.Video).previous,
                 };
 
                 const current = {
@@ -253,7 +253,7 @@ export class StateMachine {
                 };
 
                 this.debug("CombinedStatus", status, {
-                    last,
+                    previous,
                     current,
                 });
 
@@ -267,7 +267,7 @@ export class StateMachine {
                     };
                 }
 
-                handler(last, current, (): void => this.setLastIndex(whiteboard, video));
+                handler(previous, current, (): void => this.setPreviousIndex(whiteboard, video));
             },
         });
     }
