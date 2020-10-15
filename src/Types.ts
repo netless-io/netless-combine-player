@@ -49,16 +49,17 @@ export type StatusData = {
     previous: Status;
 };
 
-export type Table = { readonly name: CombineStatus; readonly event: EmptyCallback }[][];
+export type Table = readonly (readonly TableData[])[];
 
 export type CombinationStatusData = {
     previous: CombineStatus;
     current: CombineStatus;
 };
 
-export type EventData = {
-    name: CombineStatus;
-    event: EmptyCallback;
-};
+export type GenerateTable = (whiteboard: Status, video: Status) => TableData;
 
-export type GenerateEvent = (whiteboard: Status, video: Status) => EventData;
+export type TableData = {
+    combineStatus: CombineStatus;
+    whiteboardStatus: Status;
+    videoStatus: Status;
+};
