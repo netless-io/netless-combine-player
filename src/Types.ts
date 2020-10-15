@@ -1,5 +1,5 @@
 import { VideoJsPlayerOptions } from "video.js";
-import { CombineStatus, Status } from "./StatusContant";
+import { CombineStatus, Status, StatusIndex } from "./StatusContant";
 
 export interface VideoOptions extends DefaultOptions {
     url: string;
@@ -44,8 +44,7 @@ export type LockStatus = {
     unLockStatusList: CombineStatus[];
 };
 
-export type BaseStatusData = {
-    status: readonly Status[];
-    current: Status | "";
-    last: Status | "";
+export type StatusData = {
+    current: Status;
+    last: Status;
 };

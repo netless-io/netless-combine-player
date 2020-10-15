@@ -190,8 +190,7 @@ export default class CombinePlayer {
         });
 
         this.taskQueue.add((next: AnyFunction): void => {
-            const currentCombinedStatus = this.stateMachine.getCombinationStatus()
-                .current as CombineStatus;
+            const currentCombinedStatus = this.stateMachine.getCombinationStatus().current;
 
             if (currentCombinedStatus === CombineStatus.Playing) {
                 this.$seekByPlaying(next, ms);

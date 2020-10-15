@@ -1,30 +1,7 @@
 import { debugLog } from "./Log";
-import { Source, Status } from "./StatusContant";
-import {
-    EventList,
-    EmptyCallback,
-    OnEventCallback,
-    Mixing,
-    LockStatus,
-    BaseStatusData,
-} from "./Types";
+import { Source, Status, StatusIndex } from "./StatusContant";
+import { EventList, EmptyCallback, OnEventCallback, Mixing, LockStatus, StatusData } from "./Types";
 import { CombineStatus } from "./StatusContant";
-
-// 共同的状态
-const baseStatus = [
-    Status.PauseSeeking,
-    Status.Pause,
-    Status.PauseBuffering,
-    Status.PlayingBuffering,
-    Status.Playing,
-    Status.PlayingSeeking,
-    Status.Ended,
-];
-const baseStatusData: BaseStatusData = {
-    status: Object.freeze(baseStatus),
-    current: "",
-    last: "",
-};
 
 const emptyFnHandler = (_last: Mixing, _current: Mixing, done: EmptyCallback): void => {
     done();
@@ -48,12 +25,14 @@ const defaultCombineStatusHandler = (): EventList => {
 };
 
 export class StateMachine {
-    private videoStatus: BaseStatusData = {
-        ...baseStatusData,
+    private videoStatus: StatusData = {
+        current: Status.PauseBuffering,
+        last: Status.PauseBuffering,
     };
 
-    private whiteboardStatus: BaseStatusData = {
-        ...baseStatusData,
+    private whiteboardStatus: StatusData = {
+        current: Status.PauseBuffering,
+        last: Status.PauseBuffering,
     };
 
     private lockInfo: LockStatus = {
@@ -130,32 +109,26 @@ export class StateMachine {
      * @param {Status} status - 即将要更改的状态名
      */
     public emit(source: Source, status: Status): void {
-        const index = baseStatus.indexOf(status);
         if (source === Source.Video) {
-            if (this.videoStatus.current === status || index === -1) {
+            if (this.videoStatus.current === status) {
                 return;
             }
 
             this.videoStatus.current = status;
 
-            this.debug("Single", "Video", this.videoStatus.status[index]);
+            this.debug("Single", "Video", status);
         } else {
-            if (this.whiteboardStatus.current === status || index === -1) {
+            if (this.whiteboardStatus.current === status) {
                 return;
             }
 
             this.whiteboardStatus.current = status;
 
-            this.debug("Single", "Whiteboard", this.whiteboardStatus.status[index]);
+            this.debug("Single", "Whiteboard", status);
         }
 
-        // 只要有一个为 空字符串 则不做任何处理
-        if (this.whiteboardStatus.current === "" || this.videoStatus.current === "") {
-            return;
-        }
-
-        const whiteboardStatusIndex = baseStatus.indexOf(this.whiteboardStatus.current);
-        const videoStatusIndex = baseStatus.indexOf(this.videoStatus.current);
+        const whiteboardStatusIndex = StatusIndex[this.whiteboardStatus.current];
+        const videoStatusIndex = StatusIndex[this.videoStatus.current];
 
         const combineStatus = this.table[whiteboardStatusIndex][videoStatusIndex];
 
@@ -203,28 +176,19 @@ export class StateMachine {
      * 获取组合状态
      */
     public getCombinationStatus(): {
-        last: CombineStatus | undefined;
-        current: CombineStatus | undefined;
+        last: CombineStatus;
+        current: CombineStatus;
     } {
         const { last: videoLast, current: videoCurrent } = this.videoStatus;
         const { last: whiteboardLast, current: whiteboardCurrent } = this.whiteboardStatus;
 
-        let last: CombineStatus | undefined = undefined;
-        let current: CombineStatus | undefined = undefined;
+        const videoStatusLast = StatusIndex[videoLast];
+        const whiteboardStatusLast = StatusIndex[whiteboardLast];
+        const videoStatusCurrent = StatusIndex[videoCurrent];
+        const whiteboardStatusCurrent = StatusIndex[whiteboardCurrent];
 
-        if (videoLast !== "" && whiteboardLast !== "") {
-            const videoStatusLast = baseStatus.indexOf(videoLast);
-            const whiteboardStatusLast = baseStatus.indexOf(whiteboardLast);
-
-            last = this.table[whiteboardStatusLast][videoStatusLast].name;
-        }
-
-        if (videoCurrent !== "" && whiteboardCurrent !== "") {
-            const videoStatusCurrent = baseStatus.indexOf(videoCurrent);
-            const whiteboardStatusCurrent = baseStatus.indexOf(whiteboardCurrent);
-
-            current = this.table[whiteboardStatusCurrent][videoStatusCurrent].name;
-        }
+        const last = this.table[whiteboardStatusLast][videoStatusLast].name;
+        const current = this.table[whiteboardStatusCurrent][videoStatusCurrent].name;
 
         return {
             last,
@@ -239,8 +203,8 @@ export class StateMachine {
     public getStatus(
         source: Source,
     ): {
-        last: Status | "";
-        current: Status | "";
+        last: Status;
+        current: Status;
     } {
         if (source === Source.Video) {
             return {

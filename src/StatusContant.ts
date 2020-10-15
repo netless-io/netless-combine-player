@@ -8,6 +8,16 @@ export enum Status {
     Ended = "Ended",
 }
 
+export enum StatusIndex {
+    PauseSeeking,
+    Pause,
+    PauseBuffering,
+    PlayingBuffering,
+    Playing,
+    PlayingSeeking,
+    Ended,
+}
+
 export enum CombineStatus {
     PauseSeeking = "PauseSeeking",
     PlayingSeeking = "PlayingSeeking",
