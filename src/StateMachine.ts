@@ -1,5 +1,5 @@
 import { debugLog } from "./Log";
-import { CombineStatus, Source, Status, StatusIndex } from "./StatusContant";
+import { CombineStatus, Source, Status } from "./StatusContant";
 import {
     CombinationStatusData,
     EmptyCallback,
@@ -140,8 +140,8 @@ export class StateMachine {
                 break;
         }
 
-        const whiteboardStatusIndex = StatusIndex[this.whiteboardStatus.current];
-        const videoStatusIndex = StatusIndex[this.videoStatus.current];
+        const whiteboardStatusIndex = this.whiteboardStatus.current;
+        const videoStatusIndex = this.videoStatus.current;
 
         const combineStatus = this.table[whiteboardStatusIndex][videoStatusIndex];
 
@@ -195,13 +195,8 @@ export class StateMachine {
         const { previous: videoPrevious, current: videoCurrent } = this.videoStatus;
         const { previous: whiteboardPrevious, current: whiteboardCurrent } = this.whiteboardStatus;
 
-        const videoStatusPrevious = StatusIndex[videoPrevious];
-        const whiteboardStatusPrevious = StatusIndex[whiteboardPrevious];
-        const videoStatusCurrent = StatusIndex[videoCurrent];
-        const whiteboardStatusCurrent = StatusIndex[whiteboardCurrent];
-
-        const previous = this.table[whiteboardStatusPrevious][videoStatusPrevious].name;
-        const current = this.table[whiteboardStatusCurrent][videoStatusCurrent].name;
+        const previous = this.table[whiteboardPrevious][videoPrevious].name;
+        const current = this.table[whiteboardCurrent][videoCurrent].name;
 
         return {
             previous,
@@ -259,8 +254,14 @@ export class StateMachine {
                 };
 
                 this.debug("CombinedStatus", status, {
-                    previous,
-                    current,
+                    previous: {
+                        whiteboard: Status[previous.whiteboard],
+                        video: Status[previous.video],
+                    },
+                    current: {
+                        whiteboard: Status[current.whiteboard],
+                        video: Status[current.video],
+                    },
                 });
 
                 const handler = this.events[status].handler;

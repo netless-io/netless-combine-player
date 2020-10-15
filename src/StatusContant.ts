@@ -1,14 +1,4 @@
 export enum Status {
-    PauseSeeking = "PauseSeeking",
-    Pause = "Pause",
-    PauseBuffering = "PauseBuffering",
-    PlayingBuffering = "PlayingBuffering",
-    Playing = "Playing",
-    PlayingSeeking = "PlayingSeeking",
-    Ended = "Ended",
-}
-
-export enum StatusIndex {
     PauseSeeking,
     Pause,
     PauseBuffering,
