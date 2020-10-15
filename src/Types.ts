@@ -12,8 +12,8 @@ export interface DefaultOptions {
 }
 
 export type Mixing = {
-    whiteboardStatus: Status;
-    videoStatus: Status;
+    whiteboard: Status | "";
+    video: Status | "";
 };
 export type OnEventCallback = (last: Mixing, current: Mixing, done: () => void) => any;
 
@@ -44,10 +44,8 @@ export type LockStatus = {
     unLockStatusList: CombineStatus[];
 };
 
-export type TriggerSource = "none" | "video" | "whiteboard" | "plugin";
-
 export type BaseStatusData = {
     status: readonly Status[];
-    currentIndex: number;
-    lastIndex: number;
+    current: Status | "";
+    last: Status | "";
 };

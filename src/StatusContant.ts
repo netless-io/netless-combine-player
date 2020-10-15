@@ -20,3 +20,15 @@ export enum CombineStatus {
     Disabled = "Disabled",
     Ended = "Ended",
 }
+
+export enum Source {
+    Video = "Video",
+    Whiteboard = "Whiteboard",
+}
+
+export enum TriggerSource {
+    None = "None",
+    Video = "Video",
+    Whiteboard = "Whiteboard",
+    Plugin = "Plugin",
+}

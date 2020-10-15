@@ -1,5 +1,5 @@
 import { debugLog } from "./Log";
-import { Status } from "./StatusContant";
+import { Source, Status } from "./StatusContant";
 import {
     EventList,
     EmptyCallback,
@@ -20,10 +20,10 @@ const baseStatus = [
     Status.PlayingSeeking,
     Status.Ended,
 ];
-const baseStatusData = {
+const baseStatusData: BaseStatusData = {
     status: Object.freeze(baseStatus),
-    currentIndex: NaN,
-    lastIndex: NaN,
+    current: "",
+    last: "",
 };
 
 const emptyFnHandler = (_last: Mixing, _current: Mixing, done: EmptyCallback): void => {
@@ -64,7 +64,7 @@ export class StateMachine {
 
     private events: EventList = defaultCombineStatusHandler();
 
-    private table: { name: CombineStatus; event: EmptyCallback }[][] = this.initTables();
+    private readonly table: { name: CombineStatus; event: EmptyCallback }[][];
 
     private readonly debug: (...args: any[]) => void = () => {};
 
@@ -76,6 +76,8 @@ export class StateMachine {
         if (debug) {
             this.debug = debugLog;
         }
+
+        this.table = this.initTables();
     }
 
     /**
@@ -124,45 +126,38 @@ export class StateMachine {
 
     /**
      * 通知状态变更
-     * @param {"video" | "whiteboard"} source - 需要更改哪端的状态
-     * @param {Status} event - 即将要更改的状态名
+     * @param {Source} source - 需要更改哪端的状态
+     * @param {Status} status - 即将要更改的状态名
      */
-    public emit(source: "video" | "whiteboard", event: Status): void {
-        const index = baseStatus.indexOf(event) + 1;
-        if (source === "video") {
-            if (this.videoStatus.currentIndex === index) {
+    public emit(source: Source, status: Status): void {
+        const index = baseStatus.indexOf(status);
+        if (source === Source.Video) {
+            if (this.videoStatus.current === status || index === -1) {
                 return;
             }
 
-            this.videoStatus.currentIndex = index;
+            this.videoStatus.current = status;
 
-            this.debug(
-                "Single",
-                "Video",
-                this.videoStatus.status[this.videoStatus.currentIndex - 1],
-            );
+            this.debug("Single", "Video", this.videoStatus.status[index]);
         } else {
-            if (this.whiteboardStatus.currentIndex === index) {
+            if (this.whiteboardStatus.current === status || index === -1) {
                 return;
             }
 
-            this.whiteboardStatus.currentIndex = index;
+            this.whiteboardStatus.current = status;
 
-            this.debug(
-                "Single",
-                "Whiteboard",
-                this.whiteboardStatus.status[this.whiteboardStatus.currentIndex - 1],
-            );
+            this.debug("Single", "Whiteboard", this.whiteboardStatus.status[index]);
         }
 
-        // 只要有一个为 NaN 则不做任何处理
-        if (isNaN(this.whiteboardStatus.currentIndex) || isNaN(this.videoStatus.currentIndex)) {
+        // 只要有一个为 空字符串 则不做任何处理
+        if (this.whiteboardStatus.current === "" || this.videoStatus.current === "") {
             return;
         }
 
-        const combineStatus = this.table[this.whiteboardStatus.currentIndex - 1][
-            this.videoStatus.currentIndex - 1
-        ];
+        const whiteboardStatusIndex = baseStatus.indexOf(this.whiteboardStatus.current);
+        const videoStatusIndex = baseStatus.indexOf(this.videoStatus.current);
+
+        const combineStatus = this.table[whiteboardStatusIndex][videoStatusIndex];
 
         // 如果当前设置了 lock，则只有在 允许状态列表里，才会运行相关的组合状态回调
         // 当不在 解锁状态列表里，是不会运行任何的组合状态回调
@@ -204,10 +199,6 @@ export class StateMachine {
         this.lockInfo.unLockStatusList = [];
     }
 
-    public getLockInfo(): LockStatus {
-        return this.lockInfo;
-    }
-
     /**
      * 获取组合状态
      */
@@ -215,21 +206,24 @@ export class StateMachine {
         last: CombineStatus | undefined;
         current: CombineStatus | undefined;
     } {
-        const { lastIndex: videoLastIndex, currentIndex: videoCurrentIndex } = this.videoStatus;
-        const {
-            lastIndex: whiteboardLastIndex,
-            currentIndex: whiteboardCurrentIndex,
-        } = this.whiteboardStatus;
+        const { last: videoLast, current: videoCurrent } = this.videoStatus;
+        const { last: whiteboardLast, current: whiteboardCurrent } = this.whiteboardStatus;
 
         let last: CombineStatus | undefined = undefined;
         let current: CombineStatus | undefined = undefined;
 
-        if (!isNaN(videoLastIndex) && !isNaN(whiteboardLastIndex)) {
-            last = this.table[videoLastIndex - 1][whiteboardLastIndex - 1].name;
+        if (videoLast !== "" && whiteboardLast !== "") {
+            const videoStatusLast = baseStatus.indexOf(videoLast);
+            const whiteboardStatusLast = baseStatus.indexOf(whiteboardLast);
+
+            last = this.table[whiteboardStatusLast][videoStatusLast].name;
         }
 
-        if (!isNaN(videoCurrentIndex) && !isNaN(whiteboardCurrentIndex)) {
-            current = this.table[videoCurrentIndex - 1][whiteboardCurrentIndex - 1].name;
+        if (videoCurrent !== "" && whiteboardCurrent !== "") {
+            const videoStatusCurrent = baseStatus.indexOf(videoCurrent);
+            const whiteboardStatusCurrent = baseStatus.indexOf(whiteboardCurrent);
+
+            current = this.table[whiteboardStatusCurrent][videoStatusCurrent].name;
         }
 
         return {
@@ -240,38 +234,36 @@ export class StateMachine {
 
     /**
      * 获取端状态
-     * @param {"video" | "whiteboard"} source - 要查看的端
+     * @param {Source} source - 要查看的端
      */
     public getStatus(
-        source: "video" | "whiteboard",
+        source: Source,
     ): {
-        last: Status;
-        current: Status;
+        last: Status | "";
+        current: Status | "";
     } {
-        if (source === "video") {
-            const { lastIndex, currentIndex } = this.videoStatus;
+        if (source === Source.Video) {
             return {
-                last: this.videoStatus.status[lastIndex - 1],
-                current: this.videoStatus.status[currentIndex - 1],
+                last: this.videoStatus.last,
+                current: this.videoStatus.current,
             };
         } else {
-            const { lastIndex, currentIndex } = this.whiteboardStatus;
             return {
-                last: this.whiteboardStatus.status[lastIndex - 1],
-                current: this.whiteboardStatus.status[currentIndex - 1],
+                last: this.whiteboardStatus.last,
+                current: this.whiteboardStatus.current,
             };
         }
     }
 
     /**
      * 设置上一次的状态下标
-     * @param {number} whiteboardIndex - 回放的状态下标
-     * @param {number} videoIndex - videoJS 的状态下标
+     * @param {Status} whiteboard - 回放的状态下标
+     * @param {Status} video - videoJS 的状态下标
      * @private
      */
-    private setLastIndex(whiteboardIndex: number, videoIndex: number): void {
-        this.whiteboardStatus.lastIndex = whiteboardIndex;
-        this.videoStatus.lastIndex = videoIndex;
+    private setLastIndex(whiteboard: Status, video: Status): void {
+        this.whiteboardStatus.last = whiteboard;
+        this.videoStatus.last = video;
     }
 
     /**
@@ -281,19 +273,19 @@ export class StateMachine {
      */
     private generateEvent(status: CombineStatus) {
         return (
-            whiteboardIndex: number,
-            videoIndex: number,
+            whiteboard: Status,
+            video: Status,
         ): { name: CombineStatus; event: EmptyCallback } => ({
             name: status,
             event: (): void => {
                 const last = {
-                    whiteboardStatus: this.getStatus("whiteboard").last,
-                    videoStatus: this.getStatus("video").last,
+                    whiteboard: this.getStatus(Source.Whiteboard).last,
+                    video: this.getStatus(Source.Video).last,
                 };
 
                 const current = {
-                    whiteboardStatus: this.getStatus("whiteboard").current,
-                    videoStatus: this.getStatus("video").current,
+                    whiteboard: this.getStatus(Source.Whiteboard).current,
+                    video: this.getStatus(Source.Video).current,
                 };
 
                 this.debug("CombinedStatus", status, {
@@ -311,7 +303,7 @@ export class StateMachine {
                     };
                 }
 
-                handler(last, current, (): void => this.setLastIndex(whiteboardIndex, videoIndex));
+                handler(last, current, (): void => this.setLastIndex(whiteboard, video));
             },
         });
     }
@@ -335,68 +327,68 @@ export class StateMachine {
         // prettier-ignore
         return [
             [
-                pauseSeeking(1, 1),
-                pauseSeeking(1, 2),
-                disabled(1, 3),
-                disabled(1, 4),
-                disabled(1, 5),
-                disabled(1, 6),
-                pauseSeeking(1, 7),
+                pauseSeeking(Status.PauseSeeking, Status.PauseSeeking),
+                pauseSeeking(Status.PauseSeeking, Status.Pause),
+                disabled(Status.PauseSeeking, Status.PauseBuffering),
+                disabled(Status.PauseSeeking, Status.PlayingBuffering),
+                disabled(Status.PauseSeeking, Status.Playing),
+                disabled(Status.PauseSeeking, Status.PlayingSeeking),
+                pauseSeeking(Status.PauseSeeking, Status.Ended),
 
             ],
             [
-                pauseSeeking(2, 1),
-                pause(2, 2),
-                pauseBuffering(2, 3),
-                playingBuffering(2, 4),
-                toPlay(2, 5),
-                playingSeeking(2, 6),
-                ended(2, 7),
+                pauseSeeking(Status.Pause, Status.PauseSeeking),
+                pause(Status.Pause, Status.Pause),
+                pauseBuffering(Status.Pause, Status.PauseBuffering),
+                playingBuffering(Status.Pause, Status.PlayingBuffering),
+                toPlay(Status.Pause, Status.Playing),
+                playingSeeking(Status.Pause, Status.PlayingSeeking),
+                ended(Status.Pause, Status.Ended),
             ],
             [
-                disabled(3, 1),
-                pauseBuffering(3, 2),
-                pauseBuffering(3, 3),
-                disabled(3, 4),
-                disabled(3, 5),
-                disabled(3, 6),
-                disabled(3, 7),
+                disabled(Status.PauseBuffering, Status.PauseSeeking),
+                pauseBuffering(Status.PauseBuffering, Status.Pause),
+                pauseBuffering(Status.PauseBuffering, Status.PauseBuffering),
+                disabled(Status.PauseBuffering, Status.PlayingBuffering),
+                disabled(Status.PauseBuffering, Status.Playing),
+                disabled(Status.PauseBuffering, Status.PlayingSeeking),
+                disabled(Status.PauseBuffering, Status.Ended),
             ],
             [
-                disabled(4, 1),
-                playingBuffering(4, 2),
-                disabled(4, 3),
-                playingBuffering(4, 4),
-                toPause(4, 5),
-                disabled(4, 6),
-                disabled(4, 7),
+                disabled(Status.PlayingBuffering, Status.PauseSeeking),
+                playingBuffering(Status.PlayingBuffering, Status.Pause),
+                disabled(Status.PlayingBuffering, Status.PauseBuffering),
+                playingBuffering(Status.PlayingBuffering, Status.PlayingBuffering),
+                toPause(Status.PlayingBuffering, Status.Playing),
+                disabled(Status.PlayingBuffering, Status.PlayingSeeking),
+                disabled(Status.PlayingBuffering, Status.Ended),
             ],
             [
-                disabled(5, 1),
-                toPlay(5, 2),
-                disabled(5, 3),
-                toPause(5, 4),
-                playing(5, 5),
-                toPause(5, 6),
-                toPause(5, 7),
+                disabled(Status.Playing, Status.PauseSeeking),
+                toPlay(Status.Playing, Status.Pause),
+                disabled(Status.Playing, Status.PauseBuffering),
+                toPause(Status.Playing, Status.PlayingBuffering),
+                playing(Status.Playing, Status.Playing),
+                toPause(Status.Playing, Status.PlayingSeeking),
+                toPause(Status.Playing, Status.Ended),
             ],
             [
-                disabled(6, 1),
-                playingSeeking(6, 2),
-                disabled(6, 3),
-                disabled(6, 4),
-                toPause(6, 5),
-                playingSeeking(6, 6),
-                playingSeeking(6, 7),
+                disabled(Status.PlayingSeeking, Status.PauseSeeking),
+                playingSeeking(Status.PlayingSeeking, Status.Pause),
+                disabled(Status.PlayingSeeking, Status.PauseBuffering),
+                disabled(Status.PlayingSeeking, Status.PlayingBuffering),
+                toPause(Status.PlayingSeeking, Status.Playing),
+                playingSeeking(Status.PlayingSeeking, Status.PlayingSeeking),
+                playingSeeking(Status.PlayingSeeking, Status.Ended),
             ],
             [
-                pauseSeeking(7, 1),
-                ended(7, 2),
-                disabled(7, 3),
-                disabled(7, 4),
-                toPause(7, 5),
-                playingSeeking(7, 6),
-                ended(7, 7),
+                pauseSeeking(Status.Ended, Status.PauseSeeking),
+                ended(Status.Ended, Status.Pause),
+                disabled(Status.Ended, Status.PauseBuffering),
+                disabled(Status.Ended, Status.PlayingBuffering),
+                toPause(Status.Ended, Status.Playing),
+                playingSeeking(Status.Ended, Status.PlayingSeeking),
+                ended(Status.Ended, Status.Ended),
             ],
         ];
     }
