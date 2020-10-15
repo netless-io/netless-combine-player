@@ -539,7 +539,7 @@ export default class CombinePlayer {
                         CombineStatus.Disabled,
                         ACCIDENT_ENTERED_DISABLED_BY_WHITEBOARDER_IS_PAUSE_BUFFERING,
                     );
-                    this.stateMachine.unLockStatus();
+                    this.stateMachine.unlockCombineStatus();
                     this.stateMachine.off([
                         CombineStatus.PauseBuffering,
                         CombineStatus.Pause,
@@ -656,7 +656,7 @@ export default class CombinePlayer {
                         CombineStatus.Disabled,
                         ACCIDENT_ENTERED_DISABLED_BY_ALL_IS_PAUSE_BUFFERING,
                     );
-                    this.stateMachine.unLockStatus();
+                    this.stateMachine.unlockCombineStatus();
                     this.stateMachine.off([
                         CombineStatus.ToPause,
                         CombineStatus.ToPlay,
@@ -1002,7 +1002,7 @@ export default class CombinePlayer {
 
             this.taskQueue.clear();
             this.statusCallBack(CombineStatus.Disabled, ACCIDENT_ENTERED_DISABLED_BY_SEEKING_PAUSE);
-            this.stateMachine.unLockStatus();
+            this.stateMachine.unlockCombineStatus();
             clearVideoAndWhiteboardEvents();
             this.stateMachine.off([CombineStatus.Ended, CombineStatus.Pause]);
             done();

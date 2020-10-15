@@ -120,7 +120,7 @@ export class StateMachine {
      */
     public setStatus(source: Source, status: Status): void {
         switch (source) {
-            case Source.Video:
+            case Source.Video: {
                 if (this.videoStatus.current === status) {
                     return;
                 }
@@ -129,7 +129,8 @@ export class StateMachine {
 
                 this.debug("Single", "Video", status);
                 break;
-            case Source.Whiteboard:
+            }
+            case Source.Whiteboard: {
                 if (this.whiteboardStatus.current === status) {
                     return;
                 }
@@ -138,6 +139,7 @@ export class StateMachine {
 
                 this.debug("Single", "Whiteboard", status);
                 break;
+            }
         }
 
         const whiteboardStatusIndex = this.whiteboardStatus.current;
@@ -151,7 +153,7 @@ export class StateMachine {
             if (this.statusLockInfo.allowStatusList.includes(combineStatus.name)) {
                 // 当符合条件时解锁
                 if (this.statusLockInfo.unLockStatusList.includes(combineStatus.name)) {
-                    this.unLockStatus();
+                    this.unlockCombineStatus();
                 }
 
                 combineStatus.event();
@@ -182,7 +184,7 @@ export class StateMachine {
     /**
      * 关闭 状态锁
      */
-    public unLockStatus(): void {
+    public unlockCombineStatus(): void {
         this.statusLockInfo.isLocked = false;
         this.statusLockInfo.allowStatusList = [];
         this.statusLockInfo.unLockStatusList = [];
