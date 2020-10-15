@@ -3,6 +3,7 @@ module.exports = {
     plugins: ["prettier", "@typescript-eslint"],
     parserOptions: {
         project: "./tsconfig.json",
+        sourceType: "module",
     },
     extends: [
         "eslint:recommended",
@@ -12,13 +13,47 @@ module.exports = {
         "plugin:prettier/recommended",
     ],
     rules: {
+        "brace-style": ["error", "1tbs"],
+        "comma-dangle": ["error", "always-multiline"],
+        curly: ["error"],
+        eqeqeq: ["error", "always"],
+        "no-eval": ["error"],
+        "no-invalid-this": ["error"],
+        "no-throw-literal": ["off"],
+        "no-trailing-spaces": ["error"],
+        "no-unsafe-finally": ["error"],
+        "prefer-const": ["error"],
+        "spaced-comment": [
+            "error",
+            "always",
+            {
+                markers: ["/"],
+            },
+        ],
+        "use-isnan": ["error"],
+        "no-var": ["error"],
+        semi: ["error", "always"],
+        "arrow-parens": ["error", "as-needed"],
+        "@typescript-eslint/typedef": [
+            "error",
+            {
+                parameter: true,
+                memberVariableDeclaration: true,
+            },
+        ],
+        "@typescript-eslint/naming-convention": [
+            "error",
+            {
+                selector: "class",
+                format: ["PascalCase"],
+            },
+        ],
         "@typescript-eslint/array-type": [
             "error",
             {
                 default: "array",
             },
         ],
-        "@typescript-eslint/consistent-type-assertions": "error",
         "@typescript-eslint/explicit-member-accessibility": [
             "error",
             {
@@ -42,42 +77,13 @@ module.exports = {
                 },
             },
         ],
-        "@typescript-eslint/no-unused-expressions": "error",
-        "@typescript-eslint/prefer-namespace-keyword": "error",
+        "@typescript-eslint/consistent-type-assertions": ["error"],
+        "@typescript-eslint/no-unused-expressions": ["error"],
+        "@typescript-eslint/prefer-namespace-keyword": ["error"],
         "@typescript-eslint/quotes": ["error", "double"],
         "@typescript-eslint/semi": ["error", "always"],
-        "@typescript-eslint/type-annotation-spacing": "error",
-        "brace-style": ["error", "1tbs"],
-        "comma-dangle": ["error", "always-multiline"],
-        curly: "error",
-        eqeqeq: ["error", "always"],
-        "no-eval": "error",
-        "no-invalid-this": "off",
-        "no-throw-literal": "error",
-        "no-trailing-spaces": "error",
-        "no-unsafe-finally": "error",
-        "prefer-const": "error",
-        "spaced-comment": [
-            "error",
-            "always",
-            {
-                markers: ["/"],
-            },
-        ],
-        "use-isnan": "error",
-        "no-var": "error", // Disable var
-        semi: [
-            // Always use semi
-            "error",
-            "always",
-        ],
-        "@typescript-eslint/typedef": [
-            "error",
-            {
-                parameter: true,
-                memberVariableDeclaration: true,
-            },
-        ],
+        "@typescript-eslint/type-annotation-spacing": ["error"],
+        "@typescript-eslint/no-throw-literal": ["error"],
         "@typescript-eslint/explicit-function-return-type": ["error"],
         "@typescript-eslint/explicit-module-boundary-types": ["error"],
         "@typescript-eslint/ban-ts-comment": "off",
