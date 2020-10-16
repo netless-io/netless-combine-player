@@ -396,7 +396,7 @@ export default class CombinePlayerImplement implements CombinePlayer {
                 ACCIDENT_ENTERED_DISABLED_BY_ALL_IS_PAUSE,
             );
 
-            this.taskQueue.clear();
+            this.taskQueue.destroy();
             this.video.off("playing", videoOnPlaying);
             this.whiteboardEmitter.removeListener("playing", whiteboardOnPlaying);
             this.stateMachine.off([CombinePlayerStatus.ToPlay, CombinePlayerStatus.Playing]);
@@ -467,7 +467,7 @@ export default class CombinePlayerImplement implements CombinePlayer {
             this.stateMachine.one(
                 CombinePlayerStatus.Disabled,
                 (_previous, _current, done): void => {
-                    this.taskQueue.clear();
+                    this.taskQueue.destroy();
                     this.statusCallBack(
                         CombinePlayerStatus.Disabled,
                         ACCIDENT_ENTERED_DISABLED_BY_VIDEO_IS_PAUSE_BUFFERING,
@@ -555,7 +555,7 @@ export default class CombinePlayerImplement implements CombinePlayer {
                 ) {
                     this.video.pause();
                 } else {
-                    this.taskQueue.clear();
+                    this.taskQueue.destroy();
                     this.statusCallBack(
                         CombinePlayerStatus.Disabled,
                         ACCIDENT_ENTERED_DISABLED_BY_WHITEBOARDER_IS_PAUSE_BUFFERING,
@@ -685,7 +685,7 @@ export default class CombinePlayerImplement implements CombinePlayer {
                         this.whiteboard.pause();
                     }
                 } else {
-                    this.taskQueue.clear();
+                    this.taskQueue.destroy();
                     this.statusCallBack(
                         CombinePlayerStatus.Disabled,
                         ACCIDENT_ENTERED_DISABLED_BY_ALL_IS_PAUSE_BUFFERING,
@@ -781,7 +781,7 @@ export default class CombinePlayerImplement implements CombinePlayer {
         };
 
         this.stateMachine.one(CombinePlayerStatus.Disabled, (_previous, _current, done): void => {
-            this.taskQueue.clear();
+            this.taskQueue.destroy();
             this.statusCallBack(CombinePlayerStatus.Disabled, ACCIDENT_ENTERED_DISABLED_BY_ENDED);
             this.whiteboardEmitter.removeListener("pause", whiteboardOnPause);
             this.stateMachine.off(CombinePlayerStatus.Pause);
@@ -824,7 +824,7 @@ export default class CombinePlayerImplement implements CombinePlayer {
         };
 
         this.stateMachine.one(CombinePlayerStatus.Disabled, (_previous, _current, done): void => {
-            this.taskQueue.clear();
+            this.taskQueue.destroy();
             this.statusCallBack(CombinePlayerStatus.Disabled, ACCIDENT_ENTERED_DISABLED_BY_PLAYING);
             this.stateMachine.off(CombinePlayerStatus.Pause);
             this.whiteboardEmitter.removeListener("pause", whiteboardOnPause);
@@ -919,7 +919,7 @@ export default class CombinePlayerImplement implements CombinePlayer {
         };
 
         this.stateMachine.one(CombinePlayerStatus.Disabled, (_previous, _current, done): void => {
-            this.taskQueue.clear();
+            this.taskQueue.destroy();
             this.statusCallBack(
                 CombinePlayerStatus.Disabled,
                 ACCIDENT_ENTERED_DISABLED_BY_SEEKING_PLAYING,
@@ -1048,7 +1048,7 @@ export default class CombinePlayerImplement implements CombinePlayer {
                 return done();
             }
 
-            this.taskQueue.clear();
+            this.taskQueue.destroy();
             this.statusCallBack(
                 CombinePlayerStatus.Disabled,
                 ACCIDENT_ENTERED_DISABLED_BY_SEEKING_PAUSE,

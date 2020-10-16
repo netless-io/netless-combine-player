@@ -19,7 +19,10 @@ export class TaskQueue {
         }
     }
 
-    public clear(): void {
+    /**
+     * 此方法只能在 CombinePlayerStatus.Disable 状态时才能调用
+     */
+    public destroy(): void {
         this.arr = [];
     }
 
