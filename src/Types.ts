@@ -21,15 +21,6 @@ export type OnEventCallback = (
     done: () => void,
 ) => any;
 
-export type EventList = {
-    -readonly [key in CombinePlayerStatus]: {
-        handler: OnEventCallback;
-        once: boolean;
-    };
-};
-
-export type EmptyCallback = () => void;
-
 export type AnyFunction = (...args: any[]) => any;
 
 export type PublicCombinedStatus =

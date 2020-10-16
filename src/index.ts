@@ -566,6 +566,7 @@ export default class CombinePlayerImplement implements CombinePlayer {
                         CombinePlayerStatus.Pause,
                         CombinePlayerStatus.ToPause,
                         CombinePlayerStatus.Playing,
+                        CombinePlayerStatus.Disabled,
                     ]);
                     clearVideoAndWhiteboardEvents();
 
@@ -695,6 +696,7 @@ export default class CombinePlayerImplement implements CombinePlayer {
                         CombinePlayerStatus.ToPause,
                         CombinePlayerStatus.ToPlay,
                         CombinePlayerStatus.Playing,
+                        CombinePlayerStatus.Disabled,
                     ]);
                     this.whiteboardEmitter.removeListener("buffering", whiteboardOnBuffering);
                     this.whiteboardEmitter.removeListener("playing", whiteboardOnPlaying);

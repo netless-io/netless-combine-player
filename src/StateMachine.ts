@@ -2,38 +2,12 @@ import { debugLog } from "./Log";
 import { CombinePlayerStatus, AtomPlayerSource, AtomPlayerStatus } from "./StatusContant";
 import {
     CombinePlayerStatusTransfer,
-    EmptyCallback,
-    EventList,
     LockInfo,
     AtomPlayerStatusPair,
     OnEventCallback,
     AtomPlayerStatusTransfer,
 } from "./Types";
-
-const emptyFnHandler = (
-    _previous: AtomPlayerStatusPair,
-    _current: AtomPlayerStatusPair,
-    done: EmptyCallback,
-): void => {
-    done();
-};
-
-// 设置默认的 组合状态触发器
-const defaultCombineStatusHandler = (): EventList => {
-    const result = {} as EventList;
-    const keys = Object.keys(CombinePlayerStatus);
-    const len = keys.length;
-
-    for (let i = 0; i < len; i++) {
-        const key = keys[i] as CombinePlayerStatus;
-        result[key] = {
-            handler: emptyFnHandler,
-            once: false,
-        };
-    }
-
-    return result;
-};
+import { EventEmitter } from "./EventEmitter";
 
 export class StateMachine {
     private readonly videoStatus: AtomPlayerStatusTransfer = {
@@ -52,7 +26,7 @@ export class StateMachine {
         unLockStatusList: [],
     };
 
-    private readonly events: EventList = defaultCombineStatusHandler();
+    private readonly events: EventEmitter = new EventEmitter();
 
     private readonly table: Table;
 
@@ -76,10 +50,7 @@ export class StateMachine {
      * @param {OnEventCallback} cb - 事件回调
      */
     public one(eventName: CombinePlayerStatus, cb: OnEventCallback): void {
-        this.events[eventName] = {
-            handler: cb,
-            once: true,
-        };
+        this.events.one(eventName, cb);
     }
 
     /**
@@ -88,10 +59,7 @@ export class StateMachine {
      * @param {OnEventCallback} cb - 事件回调
      */
     public on(eventName: CombinePlayerStatus, cb: OnEventCallback): void {
-        this.events[eventName] = {
-            handler: cb,
-            once: false,
-        };
+        this.events.addListener(eventName, cb);
     }
 
     /**
@@ -100,16 +68,10 @@ export class StateMachine {
      */
     public off(eventName: CombinePlayerStatus | CombinePlayerStatus[]): void {
         if (typeof eventName === "string") {
-            this.events[eventName] = {
-                handler: emptyFnHandler,
-                once: false,
-            };
+            this.events.removeAllListener(eventName);
         } else {
             for (let i = 0; i < eventName.length; i++) {
-                this.events[eventName[i]] = {
-                    handler: emptyFnHandler,
-                    once: false,
-                };
+                this.events.removeAllListener(eventName[i]);
             }
         }
     }
@@ -266,19 +228,11 @@ export class StateMachine {
             },
         });
 
-        const handler = this.events[combineStatus].handler;
-
-        // 如果当前为 once，则运行完成后，置空 handler
-        if (this.events[combineStatus].once) {
-            this.events[combineStatus] = {
-                handler: emptyFnHandler,
-                once: false,
-            };
-        }
-
-        handler(previous, current, (): void => {
+        const done = (): void => {
             this.setPreviousStatus(whiteboardStatus, videoStatus);
-        });
+        };
+
+        this.events.emit(combineStatus, previous, current, done);
     }
 
     /**
