@@ -1,8 +1,13 @@
-tsconfig.json
 .eslintignore
 .eslintrc.js
 .babelrc
 .editorconfig
+.idea
+.npmignore
+.gitignore
+.prettierrc.js
+tsconfig.json
 src/
 webpack/
 node_modules/
+README.md

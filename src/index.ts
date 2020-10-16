@@ -3,6 +3,7 @@ import { verifyInstanceParams } from "./Verification";
 import { Player, PlayerPhase } from "white-web-sdk";
 import { EventEmitter } from "./EventEmitter";
 import { CombinePlayerImplement } from "./CombinePlayerImplement";
+import videojs from "video.js";
 
 export default class CombinePlayerFactory {
     private readonly videoOptions: VideoOptions;
@@ -39,12 +40,19 @@ export default class CombinePlayerFactory {
         const whiteboardEmitter: EventEmitter = new EventEmitter();
         this.handleWhiteboardCallback(whiteboardEmitter);
 
-        return new CombinePlayerImplement(
-            this.videoOptions,
-            this.whiteboard,
+        const video = videojs(this.videoOptions.videoDOM, this.videoOptions.videoJsOptions);
+        video.src(this.videoOptions.url);
+
+        return new CombinePlayerImplement({
+            videoConfig: {
+                videoOptions: this.videoOptions,
+                video,
+                isCanplay: video.readyState() > 2,
+            },
+            whiteboard: this.whiteboard,
             whiteboardEmitter,
-            this.debug,
-        );
+            debug: this.debug,
+        });
     }
 
     /**

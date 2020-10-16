@@ -50,7 +50,7 @@ export type CombinePlayerStatusTransfer = {
 };
 
 export interface CombinePlayer {
-    on(cb: (status: PublicCombinedStatus, message?: string) => any): void;
+    onStatusChange(cb: (status: PublicCombinedStatus, message?: string) => any): void;
     getStatus(): PublicCombinedStatus;
     play(): void;
     pause(): void;
