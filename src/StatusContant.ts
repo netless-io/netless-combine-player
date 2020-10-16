@@ -22,13 +22,13 @@ export enum CombinePlayerStatus {
 }
 
 export enum AtomPlayerSource {
-    Video = "Video",
-    Whiteboard = "Whiteboard",
+    Video,
+    Whiteboard,
 }
 
 export enum TriggerSource {
-    None = "None",
-    Video = "Video",
-    Whiteboard = "Whiteboard",
-    Plugin = "Plugin",
+    None,
+    Video,
+    Whiteboard,
+    Plugin,
 }

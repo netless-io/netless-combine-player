@@ -1,19 +1,20 @@
 import { debugLog } from "./Log";
 import { CombinePlayerStatus, AtomPlayerSource, AtomPlayerStatus } from "./StatusContant";
 import {
-    CombinationStatusData,
+    CombinePlayerStatusTransfer,
     EmptyCallback,
     EventList,
-    GenerateTable,
     LockInfo,
-    Mixing,
+    AtomPlayerStatusPair,
     OnEventCallback,
-    StatusData,
-    Table,
-    TableData,
+    AtomPlayerStatusTransfer,
 } from "./Types";
 
-const emptyFnHandler = (_previous: Mixing, _current: Mixing, done: EmptyCallback): void => {
+const emptyFnHandler = (
+    _previous: AtomPlayerStatusPair,
+    _current: AtomPlayerStatusPair,
+    done: EmptyCallback,
+): void => {
     done();
 };
 
@@ -35,12 +36,12 @@ const defaultCombineStatusHandler = (): EventList => {
 };
 
 export class StateMachine {
-    private readonly videoStatus: StatusData = {
+    private readonly videoStatus: AtomPlayerStatusTransfer = {
         current: AtomPlayerStatus.PauseBuffering,
         previous: AtomPlayerStatus.PauseBuffering,
     };
 
-    private readonly whiteboardStatus: StatusData = {
+    private readonly whiteboardStatus: AtomPlayerStatusTransfer = {
         current: AtomPlayerStatus.PauseBuffering,
         previous: AtomPlayerStatus.PauseBuffering,
     };
@@ -156,10 +157,10 @@ export class StateMachine {
                     this.unlockCombineStatus();
                 }
 
-                this.eventHandler(combineStatus);
+                this.handleEvent(combineStatus);
             }
         } else {
-            this.eventHandler(combineStatus);
+            this.handleEvent(combineStatus);
         }
     }
 
@@ -193,7 +194,7 @@ export class StateMachine {
     /**
      * 获取组合状态
      */
-    public getCombinationStatus(): CombinationStatusData {
+    public getCombinationStatus(): CombinePlayerStatusTransfer {
         const { previous: videoPrevious, current: videoCurrent } = this.videoStatus;
         const { previous: whiteboardPrevious, current: whiteboardCurrent } = this.whiteboardStatus;
 
@@ -210,7 +211,7 @@ export class StateMachine {
      * 获取端状态
      * @param {AtomPlayerSource} source - 要查看的端
      */
-    public getStatus(source: AtomPlayerSource): StatusData {
+    public getStatus(source: AtomPlayerSource): AtomPlayerStatusTransfer {
         switch (source) {
             case AtomPlayerSource.Video:
                 return {
@@ -241,15 +242,15 @@ export class StateMachine {
      * @param tableData
      * @private
      */
-    private eventHandler(tableData: TableData): void {
+    private handleEvent(tableData: TableData): void {
         const { videoStatus, whiteboardStatus, combineStatus } = tableData;
 
-        const previous: Mixing = {
+        const previous: AtomPlayerStatusPair = {
             whiteboard: this.getStatus(AtomPlayerSource.Whiteboard).previous,
             video: this.getStatus(AtomPlayerSource.Video).previous,
         };
 
-        const current: Mixing = {
+        const current: AtomPlayerStatusPair = {
             whiteboard: whiteboardStatus,
             video: videoStatus,
         };
@@ -377,3 +378,13 @@ export class StateMachine {
         ]);
     }
 }
+
+export type Table = readonly (readonly TableData[])[];
+
+export type TableData = {
+    readonly combineStatus: CombinePlayerStatus;
+    readonly whiteboardStatus: AtomPlayerStatus;
+    readonly videoStatus: AtomPlayerStatus;
+};
+
+export type GenerateTable = (whiteboard: AtomPlayerStatus, video: AtomPlayerStatus) => TableData;

@@ -1,6 +1,6 @@
 import videojs, { VideoJsPlayer } from "video.js";
 import { Player, PlayerPhase } from "white-web-sdk";
-import { AnyFunction, DefaultOptions, PublicCombinedStatus, VideoOptions } from "./Types";
+import { AnyFunction, VideoDefaultOptions, PublicCombinedStatus, VideoOptions } from "./Types";
 import { StateMachine } from "./StateMachine";
 import { verifyInstanceParams } from "./Verification";
 import {
@@ -27,7 +27,7 @@ import {
  * @private
  * @return DefaultOptions
  */
-const defaultOptions = (): DefaultOptions => {
+const videoDefaultOptions = (): VideoDefaultOptions => {
     return {
         videoDOM: document.createElement("video"),
         videoJsOptions: {
@@ -60,12 +60,12 @@ export default class CombinePlayer {
     public constructor(videoOptions: VideoOptions, debug: boolean = false) {
         verifyInstanceParams(videoOptions);
 
-        const _defaultOptions = defaultOptions();
+        const _videoDefaultOptions = videoDefaultOptions();
         this.videoOptions = {
-            ..._defaultOptions,
+            ..._videoDefaultOptions,
             ...videoOptions,
             videoJsOptions: {
-                ..._defaultOptions.videoJsOptions,
+                ..._videoDefaultOptions.videoJsOptions,
                 ...videoOptions.videoJsOptions,
             },
         };

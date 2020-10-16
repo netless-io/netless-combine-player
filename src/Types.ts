@@ -1,24 +1,28 @@
 import { VideoJsPlayerOptions } from "video.js";
-import { CombineStatus, Status } from "./StatusContant";
+import { CombinePlayerStatus, AtomPlayerStatus } from "./StatusContant";
 
-export interface VideoOptions extends DefaultOptions {
-    url: string;
-    videoJsOptions?: VideoJsPlayerOptions;
+export interface VideoOptions extends VideoDefaultOptions {
+    readonly url: string;
 }
 
-export interface DefaultOptions {
-    videoDOM?: HTMLVideoElement;
-    videoJsOptions?: VideoJsPlayerOptions;
+export interface VideoDefaultOptions {
+    readonly videoDOM?: HTMLVideoElement;
+    readonly videoJsOptions?: VideoJsPlayerOptions;
 }
 
-export type Mixing = {
-    whiteboard: Status;
-    video: Status;
+export type AtomPlayerStatusPair = {
+    readonly whiteboard: AtomPlayerStatus;
+    readonly video: AtomPlayerStatus;
 };
-export type OnEventCallback = (previous: Mixing, current: Mixing, done: () => void) => any;
+
+export type OnEventCallback = (
+    previous: AtomPlayerStatusPair,
+    current: AtomPlayerStatusPair,
+    done: () => void,
+) => any;
 
 export type EventList = {
-    -readonly [key in CombineStatus]: {
+    -readonly [key in CombinePlayerStatus]: {
         handler: OnEventCallback;
         once: boolean;
     };
@@ -29,37 +33,27 @@ export type EmptyCallback = () => void;
 export type AnyFunction = (...args: any[]) => any;
 
 export type PublicCombinedStatus =
-    | CombineStatus.PauseSeeking
-    | CombineStatus.PlayingSeeking
-    | CombineStatus.Pause
-    | CombineStatus.PauseBuffering
-    | CombineStatus.PlayingBuffering
-    | CombineStatus.Playing
-    | CombineStatus.Ended
-    | CombineStatus.Disabled;
+    | CombinePlayerStatus.PauseSeeking
+    | CombinePlayerStatus.PlayingSeeking
+    | CombinePlayerStatus.Pause
+    | CombinePlayerStatus.PauseBuffering
+    | CombinePlayerStatus.PlayingBuffering
+    | CombinePlayerStatus.Playing
+    | CombinePlayerStatus.Ended
+    | CombinePlayerStatus.Disabled;
 
 export type LockInfo = {
     isLocked: boolean;
-    allowStatusList: CombineStatus[];
-    unLockStatusList: CombineStatus[];
+    allowStatusList: readonly CombinePlayerStatus[];
+    unLockStatusList: readonly CombinePlayerStatus[];
 };
 
-export type StatusData = {
-    current: Status;
-    previous: Status;
+export type AtomPlayerStatusTransfer = {
+    current: AtomPlayerStatus;
+    previous: AtomPlayerStatus;
 };
 
-export type Table = readonly (readonly TableData[])[];
-
-export type CombinationStatusData = {
-    previous: CombineStatus;
-    current: CombineStatus;
-};
-
-export type GenerateTable = (whiteboard: Status, video: Status) => TableData;
-
-export type TableData = {
-    combineStatus: CombineStatus;
-    whiteboardStatus: Status;
-    videoStatus: Status;
+export type CombinePlayerStatusTransfer = {
+    readonly previous: CombinePlayerStatus;
+    readonly current: CombinePlayerStatus;
 };
