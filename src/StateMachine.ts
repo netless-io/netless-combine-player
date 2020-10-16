@@ -1,5 +1,5 @@
 import { debugLog } from "./Log";
-import { CombineStatus, Source, AtomPlayerStatus } from "./StatusContant";
+import { CombineStatus, AtomPlayerSource, AtomPlayerStatus } from "./StatusContant";
 import {
     CombinationStatusData,
     EmptyCallback,
@@ -115,12 +115,12 @@ export class StateMachine {
 
     /**
      * 通知状态变更
-     * @param {Source} source - 需要更改哪端的状态
+     * @param {AtomPlayerSource} source - 需要更改哪端的状态
      * @param {AtomPlayerStatus} status - 即将要更改的状态名
      */
-    public setStatus(source: Source, status: AtomPlayerStatus): void {
+    public setStatus(source: AtomPlayerSource, status: AtomPlayerStatus): void {
         switch (source) {
-            case Source.Video: {
+            case AtomPlayerSource.Video: {
                 if (this.videoStatus.current === status) {
                     return;
                 }
@@ -130,7 +130,7 @@ export class StateMachine {
                 this.debug("Single", "Video", AtomPlayerStatus[status]);
                 break;
             }
-            case Source.Whiteboard: {
+            case AtomPlayerSource.Whiteboard: {
                 if (this.whiteboardStatus.current === status) {
                     return;
                 }
@@ -208,16 +208,16 @@ export class StateMachine {
 
     /**
      * 获取端状态
-     * @param {Source} source - 要查看的端
+     * @param {AtomPlayerSource} source - 要查看的端
      */
-    public getStatus(source: Source): StatusData {
+    public getStatus(source: AtomPlayerSource): StatusData {
         switch (source) {
-            case Source.Video:
+            case AtomPlayerSource.Video:
                 return {
                     previous: this.videoStatus.previous,
                     current: this.videoStatus.current,
                 };
-            case Source.Whiteboard:
+            case AtomPlayerSource.Whiteboard:
                 return {
                     previous: this.whiteboardStatus.previous,
                     current: this.whiteboardStatus.current,
@@ -245,8 +245,8 @@ export class StateMachine {
         const { videoStatus, whiteboardStatus, combineStatus } = tableData;
 
         const previous: Mixing = {
-            whiteboard: this.getStatus(Source.Whiteboard).previous,
-            video: this.getStatus(Source.Video).previous,
+            whiteboard: this.getStatus(AtomPlayerSource.Whiteboard).previous,
+            video: this.getStatus(AtomPlayerSource.Video).previous,
         };
 
         const current: Mixing = {

@@ -21,7 +21,7 @@ export enum CombineStatus {
     Ended = "Ended",
 }
 
-export enum Source {
+export enum AtomPlayerSource {
     Video = "Video",
     Whiteboard = "Whiteboard",
 }
