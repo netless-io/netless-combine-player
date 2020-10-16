@@ -1,5 +1,5 @@
 import { debugLog } from "./Log";
-import { CombineStatus, Source, Status } from "./StatusContant";
+import { CombineStatus, Source, AtomPlayerStatus } from "./StatusContant";
 import {
     CombinationStatusData,
     EmptyCallback,
@@ -36,13 +36,13 @@ const defaultCombineStatusHandler = (): EventList => {
 
 export class StateMachine {
     private readonly videoStatus: StatusData = {
-        current: Status.PauseBuffering,
-        previous: Status.PauseBuffering,
+        current: AtomPlayerStatus.PauseBuffering,
+        previous: AtomPlayerStatus.PauseBuffering,
     };
 
     private readonly whiteboardStatus: StatusData = {
-        current: Status.PauseBuffering,
-        previous: Status.PauseBuffering,
+        current: AtomPlayerStatus.PauseBuffering,
+        previous: AtomPlayerStatus.PauseBuffering,
     };
 
     private readonly statusLockInfo: LockInfo = {
@@ -116,9 +116,9 @@ export class StateMachine {
     /**
      * 通知状态变更
      * @param {Source} source - 需要更改哪端的状态
-     * @param {Status} status - 即将要更改的状态名
+     * @param {AtomPlayerStatus} status - 即将要更改的状态名
      */
-    public setStatus(source: Source, status: Status): void {
+    public setStatus(source: Source, status: AtomPlayerStatus): void {
         switch (source) {
             case Source.Video: {
                 if (this.videoStatus.current === status) {
@@ -127,7 +127,7 @@ export class StateMachine {
 
                 this.videoStatus.current = status;
 
-                this.debug("Single", "Video", Status[status]);
+                this.debug("Single", "Video", AtomPlayerStatus[status]);
                 break;
             }
             case Source.Whiteboard: {
@@ -137,7 +137,7 @@ export class StateMachine {
 
                 this.whiteboardStatus.current = status;
 
-                this.debug("Single", "Whiteboard", Status[status]);
+                this.debug("Single", "Whiteboard", AtomPlayerStatus[status]);
                 break;
             }
         }
@@ -227,11 +227,11 @@ export class StateMachine {
 
     /**
      * 设置上一次的状态下标
-     * @param {Status} whiteboard - 回放的状态下标
-     * @param {Status} video - videoJS 的状态下标
+     * @param {AtomPlayerStatus} whiteboard - 回放的状态下标
+     * @param {AtomPlayerStatus} video - videoJS 的状态下标
      * @private
      */
-    private setPreviousStatus(whiteboard: Status, video: Status): void {
+    private setPreviousStatus(whiteboard: AtomPlayerStatus, video: AtomPlayerStatus): void {
         this.whiteboardStatus.previous = whiteboard;
         this.videoStatus.previous = video;
     }
@@ -256,12 +256,12 @@ export class StateMachine {
 
         this.debug("CombinedStatus", combineStatus, {
             previous: {
-                whiteboard: Status[previous.whiteboard],
-                video: Status[previous.video],
+                whiteboard: AtomPlayerStatus[previous.whiteboard],
+                video: AtomPlayerStatus[previous.video],
             },
             current: {
-                whiteboard: Status[current.whiteboard],
-                video: Status[current.video],
+                whiteboard: AtomPlayerStatus[current.whiteboard],
+                video: AtomPlayerStatus[current.video],
             },
         });
 
@@ -286,7 +286,10 @@ export class StateMachine {
      */
     private initTables(): Table {
         const generateTable = (combineStatus: CombineStatus): GenerateTable => {
-            return (whiteboardStatus: Status, videoStatus: Status): TableData => {
+            return (
+                whiteboardStatus: AtomPlayerStatus,
+                videoStatus: AtomPlayerStatus,
+            ): TableData => {
                 return Object.freeze({
                     combineStatus,
                     whiteboardStatus,
@@ -309,67 +312,67 @@ export class StateMachine {
         // prettier-ignore
         return Object.freeze([
             Object.freeze([
-                pauseSeeking(Status.PauseSeeking, Status.PauseSeeking),
-                pauseSeeking(Status.PauseSeeking, Status.Pause),
-                disabled(Status.PauseSeeking, Status.PauseBuffering),
-                disabled(Status.PauseSeeking, Status.PlayingBuffering),
-                disabled(Status.PauseSeeking, Status.Playing),
-                disabled(Status.PauseSeeking, Status.PlayingSeeking),
-                pauseSeeking(Status.PauseSeeking, Status.Ended),
+                pauseSeeking(AtomPlayerStatus.PauseSeeking, AtomPlayerStatus.PauseSeeking),
+                pauseSeeking(AtomPlayerStatus.PauseSeeking, AtomPlayerStatus.Pause),
+                disabled(AtomPlayerStatus.PauseSeeking, AtomPlayerStatus.PauseBuffering),
+                disabled(AtomPlayerStatus.PauseSeeking, AtomPlayerStatus.PlayingBuffering),
+                disabled(AtomPlayerStatus.PauseSeeking, AtomPlayerStatus.Playing),
+                disabled(AtomPlayerStatus.PauseSeeking, AtomPlayerStatus.PlayingSeeking),
+                pauseSeeking(AtomPlayerStatus.PauseSeeking, AtomPlayerStatus.Ended),
             ]),
             Object.freeze([
-                pauseSeeking(Status.Pause, Status.PauseSeeking),
-                pause(Status.Pause, Status.Pause),
-                pauseBuffering(Status.Pause, Status.PauseBuffering),
-                playingBuffering(Status.Pause, Status.PlayingBuffering),
-                toPlay(Status.Pause, Status.Playing),
-                playingSeeking(Status.Pause, Status.PlayingSeeking),
-                ended(Status.Pause, Status.Ended),
+                pauseSeeking(AtomPlayerStatus.Pause, AtomPlayerStatus.PauseSeeking),
+                pause(AtomPlayerStatus.Pause, AtomPlayerStatus.Pause),
+                pauseBuffering(AtomPlayerStatus.Pause, AtomPlayerStatus.PauseBuffering),
+                playingBuffering(AtomPlayerStatus.Pause, AtomPlayerStatus.PlayingBuffering),
+                toPlay(AtomPlayerStatus.Pause, AtomPlayerStatus.Playing),
+                playingSeeking(AtomPlayerStatus.Pause, AtomPlayerStatus.PlayingSeeking),
+                ended(AtomPlayerStatus.Pause, AtomPlayerStatus.Ended),
             ]),
             Object.freeze([
-                disabled(Status.PauseBuffering, Status.PauseSeeking),
-                pauseBuffering(Status.PauseBuffering, Status.Pause),
-                pauseBuffering(Status.PauseBuffering, Status.PauseBuffering),
-                disabled(Status.PauseBuffering, Status.PlayingBuffering),
-                disabled(Status.PauseBuffering, Status.Playing),
-                disabled(Status.PauseBuffering, Status.PlayingSeeking),
-                disabled(Status.PauseBuffering, Status.Ended),
+                disabled(AtomPlayerStatus.PauseBuffering, AtomPlayerStatus.PauseSeeking),
+                pauseBuffering(AtomPlayerStatus.PauseBuffering, AtomPlayerStatus.Pause),
+                pauseBuffering(AtomPlayerStatus.PauseBuffering, AtomPlayerStatus.PauseBuffering),
+                disabled(AtomPlayerStatus.PauseBuffering, AtomPlayerStatus.PlayingBuffering),
+                disabled(AtomPlayerStatus.PauseBuffering, AtomPlayerStatus.Playing),
+                disabled(AtomPlayerStatus.PauseBuffering, AtomPlayerStatus.PlayingSeeking),
+                disabled(AtomPlayerStatus.PauseBuffering, AtomPlayerStatus.Ended),
             ]),
             ([
-                disabled(Status.PlayingBuffering, Status.PauseSeeking),
-                playingBuffering(Status.PlayingBuffering, Status.Pause),
-                disabled(Status.PlayingBuffering, Status.PauseBuffering),
-                playingBuffering(Status.PlayingBuffering, Status.PlayingBuffering),
-                toPause(Status.PlayingBuffering, Status.Playing),
-                disabled(Status.PlayingBuffering, Status.PlayingSeeking),
-                disabled(Status.PlayingBuffering, Status.Ended),
+                disabled(AtomPlayerStatus.PlayingBuffering, AtomPlayerStatus.PauseSeeking),
+                playingBuffering(AtomPlayerStatus.PlayingBuffering, AtomPlayerStatus.Pause),
+                disabled(AtomPlayerStatus.PlayingBuffering, AtomPlayerStatus.PauseBuffering),
+                playingBuffering(AtomPlayerStatus.PlayingBuffering, AtomPlayerStatus.PlayingBuffering),
+                toPause(AtomPlayerStatus.PlayingBuffering, AtomPlayerStatus.Playing),
+                disabled(AtomPlayerStatus.PlayingBuffering, AtomPlayerStatus.PlayingSeeking),
+                disabled(AtomPlayerStatus.PlayingBuffering, AtomPlayerStatus.Ended),
             ]),
             Object.freeze([
-                disabled(Status.Playing, Status.PauseSeeking),
-                toPlay(Status.Playing, Status.Pause),
-                disabled(Status.Playing, Status.PauseBuffering),
-                toPause(Status.Playing, Status.PlayingBuffering),
-                playing(Status.Playing, Status.Playing),
-                toPause(Status.Playing, Status.PlayingSeeking),
-                toPause(Status.Playing, Status.Ended),
+                disabled(AtomPlayerStatus.Playing, AtomPlayerStatus.PauseSeeking),
+                toPlay(AtomPlayerStatus.Playing, AtomPlayerStatus.Pause),
+                disabled(AtomPlayerStatus.Playing, AtomPlayerStatus.PauseBuffering),
+                toPause(AtomPlayerStatus.Playing, AtomPlayerStatus.PlayingBuffering),
+                playing(AtomPlayerStatus.Playing, AtomPlayerStatus.Playing),
+                toPause(AtomPlayerStatus.Playing, AtomPlayerStatus.PlayingSeeking),
+                toPause(AtomPlayerStatus.Playing, AtomPlayerStatus.Ended),
             ]),
             Object.freeze([
-                disabled(Status.PlayingSeeking, Status.PauseSeeking),
-                playingSeeking(Status.PlayingSeeking, Status.Pause),
-                disabled(Status.PlayingSeeking, Status.PauseBuffering),
-                disabled(Status.PlayingSeeking, Status.PlayingBuffering),
-                toPause(Status.PlayingSeeking, Status.Playing),
-                playingSeeking(Status.PlayingSeeking, Status.PlayingSeeking),
-                playingSeeking(Status.PlayingSeeking, Status.Ended),
+                disabled(AtomPlayerStatus.PlayingSeeking, AtomPlayerStatus.PauseSeeking),
+                playingSeeking(AtomPlayerStatus.PlayingSeeking, AtomPlayerStatus.Pause),
+                disabled(AtomPlayerStatus.PlayingSeeking, AtomPlayerStatus.PauseBuffering),
+                disabled(AtomPlayerStatus.PlayingSeeking, AtomPlayerStatus.PlayingBuffering),
+                toPause(AtomPlayerStatus.PlayingSeeking, AtomPlayerStatus.Playing),
+                playingSeeking(AtomPlayerStatus.PlayingSeeking, AtomPlayerStatus.PlayingSeeking),
+                playingSeeking(AtomPlayerStatus.PlayingSeeking, AtomPlayerStatus.Ended),
             ]),
             Object.freeze([
-                pauseSeeking(Status.Ended, Status.PauseSeeking),
-                ended(Status.Ended, Status.Pause),
-                disabled(Status.Ended, Status.PauseBuffering),
-                disabled(Status.Ended, Status.PlayingBuffering),
-                toPause(Status.Ended, Status.Playing),
-                playingSeeking(Status.Ended, Status.PlayingSeeking),
-                ended(Status.Ended, Status.Ended),
+                pauseSeeking(AtomPlayerStatus.Ended, AtomPlayerStatus.PauseSeeking),
+                ended(AtomPlayerStatus.Ended, AtomPlayerStatus.Pause),
+                disabled(AtomPlayerStatus.Ended, AtomPlayerStatus.PauseBuffering),
+                disabled(AtomPlayerStatus.Ended, AtomPlayerStatus.PlayingBuffering),
+                toPause(AtomPlayerStatus.Ended, AtomPlayerStatus.Playing),
+                playingSeeking(AtomPlayerStatus.Ended, AtomPlayerStatus.PlayingSeeking),
+                ended(AtomPlayerStatus.Ended, AtomPlayerStatus.Ended),
             ]),
         ]);
     }

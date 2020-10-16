@@ -1,4 +1,4 @@
-export enum Status {
+export enum AtomPlayerStatus {
     PauseSeeking,
     Pause,
     PauseBuffering,
