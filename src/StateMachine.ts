@@ -286,6 +286,10 @@ export class StateMachine {
      * @private
      */
     private initTables(): Table {
+        /**
+         * 这里使用柯里化进行封装，是为了代码美观。实际上是没有意义的
+         * @param {CombinePlayerStatus} combineStatus - 组合状态
+         */
         const generateTable = (combineStatus: CombinePlayerStatus): GenerateTable => {
             return (
                 whiteboardStatus: AtomPlayerStatus,
