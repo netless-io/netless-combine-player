@@ -1,8 +1,7 @@
 import videojs, { VideoJsPlayer } from "video.js";
-import { Player, PlayerPhase } from "white-web-sdk";
-import { AnyFunction, VideoDefaultOptions, PublicCombinedStatus, VideoOptions } from "./Types";
+import { Player } from "white-web-sdk";
+import { AnyFunction, PublicCombinedStatus, VideoOptions } from "./Types";
 import { StateMachine } from "./StateMachine";
-import { verifyInstanceParams } from "./Verification";
 import {
     CombinePlayerStatus,
     AtomPlayerSource,
@@ -21,97 +20,45 @@ import {
     ACCIDENT_ENTERED_DISABLED_BY_VIDEO_IS_PAUSE_BUFFERING,
     ACCIDENT_ENTERED_DISABLED_BY_WHITEBOARDER_IS_PAUSE_BUFFERING,
 } from "./ErrorConstant";
-
-/**
- * 实例化时默认传参
- * @private
- * @return DefaultOptions
- */
-const videoDefaultOptions = (): VideoDefaultOptions => {
-    return {
-        videoDOM: document.createElement("video"),
-        videoJsOptions: {
-            preload: "auto",
-        },
-    };
-};
+import { CombinePlayerFactory } from "./CombinePlayerFactory";
 
 // 记录最后一次的公开状态，防止多发
 let lastPublicCombinedStatus: PublicCombinedStatus = CombinePlayerStatus.PauseBuffering;
 
 export default class CombinePlayer {
-    private videoJS: VideoJsPlayer | undefined = undefined;
-    private whiteboard: undefined | Player = undefined;
-    private readonly videoOptions: VideoOptions | undefined = undefined;
+    private readonly video: VideoJsPlayer;
+    private readonly whiteboard: Player;
+    private readonly videoOptions: VideoOptions;
     private readonly stateMachine: StateMachine;
 
     private statusCallBack: (status: PublicCombinedStatus, message?: string) => any = () => {};
 
     private triggerSource: TriggerSource = TriggerSource.None;
 
-    private readonly whiteboardEventEmitter: EventEmitter = new EventEmitter();
+    private readonly whiteboardEmitter: EventEmitter;
     private readonly taskQueue: TaskQueue = new TaskQueue();
 
     /**
      * 实例化 Combine-Player 插件
-     * @param {VideoOptions} [videoOptions=DefaultOptions] - video 配置项
+     * @param {CombinePlayerFactory} combinePlayerFactory - 用于获取 video、whiteboard 对象
      * @param {boolean} [debug=false] - 是否开启 debug 日志
      */
-    public constructor(videoOptions: VideoOptions, debug: boolean = false) {
-        verifyInstanceParams(videoOptions);
-
-        const _videoDefaultOptions = videoDefaultOptions();
-        this.videoOptions = {
-            ..._videoDefaultOptions,
-            ...videoOptions,
-            videoJsOptions: {
-                ..._videoDefaultOptions.videoJsOptions,
-                ...videoOptions.videoJsOptions,
-            },
-        };
+    public constructor(combinePlayerFactory: CombinePlayerFactory, debug: boolean = false) {
+        this.videoOptions = combinePlayerFactory.getVideo();
+        this.whiteboard = combinePlayerFactory.getWhiteboard();
+        this.whiteboardEmitter = combinePlayerFactory.getWhiteboardEmitter();
 
         this.stateMachine = new StateMachine(debug);
+
+        const video = videojs(this.videoOptions.videoDOM, this.videoOptions.videoJsOptions);
+        video.src(this.videoOptions.url);
+
+        this.video = video;
+
         this.initVideoJS();
-    }
 
-    /**
-     * 设置白板的 Player 实例
-     * @param {Player} whiteboard - 白板实例
-     */
-    public setWhiteboard(whiteboard: Player): void {
-        this.whiteboard = whiteboard;
-
-        // 这里 提前进行了状态机改变，因为回放在 seek 时，不会触发 Buffering 事件，所以在这里需要提前设置。以保证状态正确
-        this.stateMachine.setStatus(AtomPlayerSource.Whiteboard, AtomPlayerStatus.PauseBuffering);
-        this.statusCallBack(CombinePlayerStatus.PauseBuffering);
-        // 先seek到第一帧，以拿到 whiteboard 的状态。否则 whiteboard 会永远在 waitingFirstFrame 状态，isPlayable 也会一直是 false
-        this.whiteboard.seekToProgressTime(0);
-        this.initWhiteboardEvents();
-    }
-
-    /**
-     * 设置白板的事件回调
-     * @param {PlayerPhase} phase - 事件名称
-     */
-    public setWhiteboardEvents(phase: PlayerPhase): void {
-        this.whiteboardEventEmitter.emit(phase);
-    }
-
-    /**
-     * 设置 回放 的 isPlayable 事件
-     * @param {boolean} isPlayable - 是否可播放
-     */
-    public setWhiteboardIsPlayable(isPlayable: boolean): void {
-        const whiteboardStatus = this.stateMachine.getStatus(AtomPlayerSource.Whiteboard).current;
-        const videoStatus = this.stateMachine.getStatus(AtomPlayerSource.Video).current;
-
-        // 当 当前回放确认已经加载好了，并且当前 回放 的状态为 PauseBuffering 时，就可以把 回放 的状态修改为 Pause 状态了
-        if (isPlayable && whiteboardStatus === AtomPlayerStatus.PauseBuffering) {
-            this.stateMachine.setStatus(AtomPlayerSource.Whiteboard, AtomPlayerStatus.Pause);
-            if (videoStatus === AtomPlayerStatus.Pause) {
-                this.statusCallBack(CombinePlayerStatus.Pause);
-            }
-        }
+        this.handleWhiteboard();
+        this.handleWhiteboardIsPlayable();
     }
 
     /**
@@ -219,11 +166,6 @@ export default class CombinePlayer {
 
     // 初始化 video.js
     private initVideoJS(): void {
-        const videoJS = videojs(this.videoOptions!.videoDOM, this.videoOptions!.videoJsOptions);
-        videoJS.src(this.videoOptions!.url);
-
-        this.videoJS = videoJS;
-
         const videoIsCanplay = this.videoIsCanplay();
         this.stateMachine.setStatus(
             AtomPlayerSource.Video,
@@ -263,7 +205,7 @@ export default class CombinePlayer {
             };
         };
 
-        this.videoJS!.on("canplay", (): void => {
+        this.video.on("canplay", (): void => {
             const whiteboardStatus = this.stateMachine.getStatus(AtomPlayerSource.Whiteboard)
                 .current;
             const videoStatus = this.stateMachine.getStatus(AtomPlayerSource.Video).current;
@@ -279,14 +221,14 @@ export default class CombinePlayer {
         });
 
         // 能触发此事件的，只有 video 丢帧时，会被触发。
-        this.videoJS!.on(
+        this.video.on(
             "seeking",
             warp((): void => {
                 isDropFrame = true;
             }),
         );
 
-        this.videoJS!.on(
+        this.video.on(
             "waiting",
             warp((): void => {
                 this.stateMachine.setStatus(
@@ -304,7 +246,7 @@ export default class CombinePlayer {
             }),
         );
 
-        this.videoJS!.on(
+        this.video.on(
             "playing",
             warp((): void => {
                 this.taskQueue.add((next: AnyFunction): void => {
@@ -317,7 +259,7 @@ export default class CombinePlayer {
             }),
         );
 
-        this.videoJS!.on(
+        this.video.on(
             "ended",
             warp((): void => {
                 this.taskQueue.add((next: AnyFunction): void => {
@@ -328,6 +270,37 @@ export default class CombinePlayer {
                 });
             }),
         );
+    }
+
+    /**
+     * 初始化 whiteboard
+     */
+    private handleWhiteboard(): void {
+        // 这里 提前进行了状态机改变，因为回放在 seek 时，不会触发 Buffering 事件，所以在这里需要提前设置。以保证状态正确
+        this.stateMachine.setStatus(AtomPlayerSource.Whiteboard, AtomPlayerStatus.PauseBuffering);
+        this.statusCallBack(CombinePlayerStatus.PauseBuffering);
+        // 先seek到第一帧，以拿到 whiteboard 的状态。否则 whiteboard 会永远在 waitingFirstFrame 状态，isPlayable 也会一直是 false
+        this.whiteboard.seekToProgressTime(0);
+        this.initWhiteboardEvents();
+    }
+
+    /**
+     * 设置 回放 的 isPlayable 事件
+     */
+    private handleWhiteboardIsPlayable(): void {
+        this.whiteboardEmitter.addListener("playableChange", (isPlayable: boolean): void => {
+            const whiteboardStatus = this.stateMachine.getStatus(AtomPlayerSource.Whiteboard)
+                .current;
+            const videoStatus = this.stateMachine.getStatus(AtomPlayerSource.Video).current;
+
+            // 当 当前回放确认已经加载好了，并且当前 回放 的状态为 PauseBuffering 时，就可以把 回放 的状态修改为 Pause 状态了
+            if (isPlayable && whiteboardStatus === AtomPlayerStatus.PauseBuffering) {
+                this.stateMachine.setStatus(AtomPlayerSource.Whiteboard, AtomPlayerStatus.Pause);
+                if (videoStatus === AtomPlayerStatus.Pause) {
+                    this.statusCallBack(CombinePlayerStatus.Pause);
+                }
+            }
+        });
     }
 
     private initWhiteboardEvents(): void {
@@ -350,7 +323,7 @@ export default class CombinePlayer {
             };
         };
 
-        this.whiteboardEventEmitter.addListener(
+        this.whiteboardEmitter.addListener(
             "buffering",
             warp((): void => {
                 this.stateMachine.setStatus(
@@ -362,24 +335,24 @@ export default class CombinePlayer {
                     this.$pauseVideoByWhiteboardBuffering(next);
                 });
                 this.taskQueue.add((next: AnyFunction): void => {
-                    this.$setTriggerSource(next, TriggerSource.Whiteboard);
+                    this.$setTriggerSource(next, TriggerSource.None);
                 });
             }),
         );
 
-        this.whiteboardEventEmitter.addListener(
+        this.whiteboardEmitter.addListener(
             "playing",
             warp((): void => {
                 this.taskQueue.add((next: AnyFunction): void => {
                     this.$playingVideoByWhiteboardPlaying(next);
                 });
                 this.taskQueue.add((next: AnyFunction): void => {
-                    this.$setTriggerSource(next, TriggerSource.Whiteboard);
+                    this.$setTriggerSource(next, TriggerSource.None);
                 });
             }),
         );
 
-        this.whiteboardEventEmitter.addListener(
+        this.whiteboardEmitter.addListener(
             "ended",
             warp((): void => {
                 this.taskQueue.add((next: AnyFunction): void => {
@@ -418,8 +391,8 @@ export default class CombinePlayer {
             );
 
             this.taskQueue.clear();
-            this.videoJS!.off("playing", videoOnPlaying);
-            this.whiteboardEventEmitter.removeListener("playing", whiteboardOnPlaying);
+            this.video.off("playing", videoOnPlaying);
+            this.whiteboardEmitter.removeListener("playing", whiteboardOnPlaying);
             this.stateMachine.off([CombinePlayerStatus.ToPlay, CombinePlayerStatus.Playing]);
 
             done();
@@ -433,16 +406,16 @@ export default class CombinePlayer {
             next();
         });
 
-        this.whiteboardEventEmitter.one("playing", whiteboardOnPlaying);
+        this.whiteboardEmitter.one("playing", whiteboardOnPlaying);
 
         this.stateMachine.one(CombinePlayerStatus.ToPlay, (_previous, _current, done): void => {
-            this.whiteboard!.play();
+            this.whiteboard.play();
             done();
         });
 
-        this.videoJS!.one("playing", videoOnPlaying);
+        this.video.one("playing", videoOnPlaying);
 
-        this.videoJS!.play();
+        this.video.play();
     }
 
     /**
@@ -493,22 +466,22 @@ export default class CombinePlayer {
                         CombinePlayerStatus.Disabled,
                         ACCIDENT_ENTERED_DISABLED_BY_VIDEO_IS_PAUSE_BUFFERING,
                     );
-                    this.whiteboardEventEmitter.removeListener("playing", whiteboardOnPlaying);
+                    this.whiteboardEmitter.removeListener("playing", whiteboardOnPlaying);
                     this.stateMachine.off([
                         CombinePlayerStatus.ToPlay,
                         CombinePlayerStatus.Playing,
                     ]);
-                    this.videoJS!.off("play", videoOnPlay);
-                    this.videoJS!.off("playing", videoOnPlaying);
+                    this.video.off("play", videoOnPlay);
+                    this.video.off("playing", videoOnPlaying);
                     done();
                     next();
                 },
             );
 
-            this.whiteboardEventEmitter.one("playing", whiteboardOnPlaying);
+            this.whiteboardEmitter.one("playing", whiteboardOnPlaying);
 
             this.stateMachine.one(CombinePlayerStatus.ToPlay, (_previous, _current, done): void => {
-                this.whiteboard!.play();
+                this.whiteboard.play();
                 done();
             });
 
@@ -522,11 +495,11 @@ export default class CombinePlayer {
                 },
             );
 
-            this.videoJS!.one("play", videoOnPlay);
+            this.video.one("play", videoOnPlay);
 
-            this.videoJS!.one("playing", videoOnPlaying);
+            this.video.one("playing", videoOnPlaying);
 
-            this.videoJS!.play();
+            this.video.play();
         } else if (
             videoStatus === AtomPlayerStatus.Pause &&
             whiteboardStatus === AtomPlayerStatus.PauseBuffering
@@ -562,10 +535,10 @@ export default class CombinePlayer {
             };
 
             const clearVideoAndWhiteboardEvents = (): void => {
-                this.whiteboardEventEmitter.removeListener("playing", whiteboardOnPlaying);
-                this.whiteboardEventEmitter.removeListener("buffering", whiteboardOnBuffering);
-                this.videoJS!.off("playing", videoOnPlaying);
-                this.videoJS!.off("pause", videoOnPause);
+                this.whiteboardEmitter.removeListener("playing", whiteboardOnPlaying);
+                this.whiteboardEmitter.removeListener("buffering", whiteboardOnBuffering);
+                this.video.off("playing", videoOnPlaying);
+                this.video.off("pause", videoOnPause);
             };
 
             this.stateMachine.on(CombinePlayerStatus.Disabled, (_previous, current, done): void => {
@@ -574,7 +547,7 @@ export default class CombinePlayer {
                     current.video === AtomPlayerStatus.Playing &&
                     current.whiteboard === AtomPlayerStatus.PauseBuffering
                 ) {
-                    this.videoJS!.pause();
+                    this.video.pause();
                 } else {
                     this.taskQueue.clear();
                     this.statusCallBack(
@@ -601,18 +574,18 @@ export default class CombinePlayer {
             this.stateMachine.one(
                 CombinePlayerStatus.PauseBuffering,
                 (_previous, _current, done): void => {
-                    this.whiteboard!.play();
+                    this.whiteboard.play();
                     done();
                 },
             );
 
             this.stateMachine.one(CombinePlayerStatus.Pause, (_previous, _current, done): void => {
-                this.whiteboard!.play();
+                this.whiteboard.play();
                 done();
             });
 
             this.stateMachine.one(CombinePlayerStatus.ToPlay, (_previous, _current, done): void => {
-                this.videoJS!.play();
+                this.video.play();
                 done();
             });
 
@@ -632,15 +605,15 @@ export default class CombinePlayer {
                 },
             );
 
-            this.whiteboardEventEmitter.one("buffering", whiteboardOnBuffering);
+            this.whiteboardEmitter.one("buffering", whiteboardOnBuffering);
 
-            this.whiteboardEventEmitter.one("playing", whiteboardOnPlaying);
+            this.whiteboardEmitter.one("playing", whiteboardOnPlaying);
 
-            this.videoJS!.on("playing", videoOnPlaying);
+            this.video.on("playing", videoOnPlaying);
 
-            this.videoJS!.one("pause", videoOnPause);
+            this.video.one("pause", videoOnPause);
 
-            this.videoJS!.play();
+            this.video.play();
         } else {
             this.stateMachine.lockCombineStatus(
                 [
@@ -701,9 +674,9 @@ export default class CombinePlayer {
                 ) {
                     // 这里是因为有可能存在，有一端已经开始播放了，但是另一端还在 pauseBuffering 状态。所以需要把播放的一端进行暂停
                     if (video === AtomPlayerStatus.Playing) {
-                        this.videoJS!.pause();
+                        this.video.pause();
                     } else {
-                        this.whiteboard!.pause();
+                        this.whiteboard.pause();
                     }
                 } else {
                     this.taskQueue.clear();
@@ -717,12 +690,12 @@ export default class CombinePlayer {
                         CombinePlayerStatus.ToPlay,
                         CombinePlayerStatus.Playing,
                     ]);
-                    this.whiteboardEventEmitter.removeListener("buffering", whiteboardOnBuffering);
-                    this.whiteboardEventEmitter.removeListener("playing", whiteboardOnPlaying);
-                    this.whiteboardEventEmitter.removeListener("pause", whiteboardOnPause);
-                    this.videoJS!.off("playing", videoOnPlaying);
-                    this.videoJS!.off("play", videoOnPlay);
-                    this.videoJS!.off("pause", videoOnPause);
+                    this.whiteboardEmitter.removeListener("buffering", whiteboardOnBuffering);
+                    this.whiteboardEmitter.removeListener("playing", whiteboardOnPlaying);
+                    this.whiteboardEmitter.removeListener("pause", whiteboardOnPause);
+                    this.video.off("playing", videoOnPlaying);
+                    this.video.off("play", videoOnPlay);
+                    this.video.off("pause", videoOnPause);
 
                     done();
                     next();
@@ -734,9 +707,9 @@ export default class CombinePlayer {
 
             this.stateMachine.one(CombinePlayerStatus.ToPause, (_previous, current, done): void => {
                 if (current.video === AtomPlayerStatus.Playing) {
-                    this.videoJS!.pause();
+                    this.video.pause();
                 } else {
-                    this.whiteboard!.pause();
+                    this.whiteboard.pause();
                 }
 
                 done();
@@ -744,9 +717,9 @@ export default class CombinePlayer {
 
             this.stateMachine.one(CombinePlayerStatus.ToPlay, (_previous, current, done): void => {
                 if (current.video === AtomPlayerStatus.Playing) {
-                    this.whiteboard!.play();
+                    this.whiteboard.play();
                 } else {
-                    this.videoJS!.play();
+                    this.video.play();
                 }
 
                 done();
@@ -756,28 +729,28 @@ export default class CombinePlayer {
                 CombinePlayerStatus.Playing,
                 (_previous, _current, done): void => {
                     this.statusCallBack(CombinePlayerStatus.Playing);
-                    this.videoJS!.off("playing", videoOnPlaying);
+                    this.video.off("playing", videoOnPlaying);
                     this.stateMachine.off(CombinePlayerStatus.Disabled);
-                    this.whiteboardEventEmitter.removeListener("playing", whiteboardOnPlaying);
+                    this.whiteboardEmitter.removeListener("playing", whiteboardOnPlaying);
                     done();
                     next();
                 },
             );
 
-            this.whiteboardEventEmitter.one("buffering", whiteboardOnBuffering);
+            this.whiteboardEmitter.one("buffering", whiteboardOnBuffering);
 
-            this.whiteboardEventEmitter.addListener("playing", whiteboardOnPlaying);
+            this.whiteboardEmitter.addListener("playing", whiteboardOnPlaying);
 
-            this.whiteboardEventEmitter.one("pause", whiteboardOnPause);
+            this.whiteboardEmitter.one("pause", whiteboardOnPause);
 
-            this.videoJS!.on("playing", videoOnPlaying);
+            this.video.on("playing", videoOnPlaying);
 
-            this.videoJS!.one("play", videoOnPlay);
+            this.video.one("play", videoOnPlay);
 
-            this.videoJS!.one("pause", videoOnPause);
+            this.video.one("pause", videoOnPause);
 
-            this.videoJS!.play();
-            this.whiteboard!.play();
+            this.video.play();
+            this.whiteboard.play();
         }
     }
 
@@ -804,9 +777,9 @@ export default class CombinePlayer {
         this.stateMachine.one(CombinePlayerStatus.Disabled, (_previous, _current, done): void => {
             this.taskQueue.clear();
             this.statusCallBack(CombinePlayerStatus.Disabled, ACCIDENT_ENTERED_DISABLED_BY_ENDED);
-            this.whiteboardEventEmitter.removeListener("pause", whiteboardOnPause);
+            this.whiteboardEmitter.removeListener("pause", whiteboardOnPause);
             this.stateMachine.off(CombinePlayerStatus.Pause);
-            this.videoJS!.off("canplay", videoOnCanplay);
+            this.video.off("canplay", videoOnCanplay);
             done();
             next();
         });
@@ -817,12 +790,12 @@ export default class CombinePlayer {
             next();
         });
 
-        this.whiteboardEventEmitter.one("pause", whiteboardOnPause);
+        this.whiteboardEmitter.one("pause", whiteboardOnPause);
 
-        this.videoJS!.one("canplay", videoOnCanplay);
+        this.video.one("canplay", videoOnCanplay);
 
-        this.whiteboard!.seekToProgressTime(0);
-        this.videoJS!.currentTime(0);
+        this.whiteboard.seekToProgressTime(0);
+        this.video.currentTime(0);
     }
 
     /**
@@ -848,8 +821,8 @@ export default class CombinePlayer {
             this.taskQueue.clear();
             this.statusCallBack(CombinePlayerStatus.Disabled, ACCIDENT_ENTERED_DISABLED_BY_PLAYING);
             this.stateMachine.off(CombinePlayerStatus.Pause);
-            this.whiteboardEventEmitter.removeListener("pause", whiteboardOnPause);
-            this.videoJS!.off("pause", videoOnPause);
+            this.whiteboardEmitter.removeListener("pause", whiteboardOnPause);
+            this.video.off("pause", videoOnPause);
             done();
         });
 
@@ -859,12 +832,12 @@ export default class CombinePlayer {
             next();
         });
 
-        this.whiteboardEventEmitter.one("pause", whiteboardOnPause);
+        this.whiteboardEmitter.one("pause", whiteboardOnPause);
 
-        this.videoJS!.one("pause", videoOnPause);
+        this.video.one("pause", videoOnPause);
 
-        this.whiteboard!.pause();
-        this.videoJS!.pause();
+        this.whiteboard.pause();
+        this.video.pause();
     }
 
     /**
@@ -876,8 +849,8 @@ export default class CombinePlayer {
     private $seekByPlaying(next: AnyFunction, ms: number): void {
         this.statusCallBack(CombinePlayerStatus.PlayingSeeking);
 
-        const whiteboardDuration = this.whiteboard!.timeDuration;
-        const videoDuration = this.videoJS!.duration() * 1000;
+        const whiteboardDuration = this.whiteboard.timeDuration;
+        const videoDuration = this.video.duration() * 1000;
 
         this.stateMachine.lockCombineStatus(
             [
@@ -903,7 +876,7 @@ export default class CombinePlayer {
         };
 
         const whiteboardOnPlaying = (): void => {
-            this.whiteboard!.pause();
+            this.whiteboard.pause();
         };
 
         const whiteboardOnEnded = (): void => {
@@ -921,7 +894,7 @@ export default class CombinePlayer {
         };
 
         const videoOnPlaying = (): void => {
-            this.videoJS!.pause();
+            this.video.pause();
         };
 
         const videoOnEnded = (): void => {
@@ -929,14 +902,14 @@ export default class CombinePlayer {
         };
 
         const clearVideoAndWhiteboardEvents = (): void => {
-            this.whiteboardEventEmitter.removeListener("buffering", whiteboardOnBuffering);
-            this.whiteboardEventEmitter.removeListener("pause", whiteboardOnPause);
-            this.whiteboardEventEmitter.removeListener("playing", whiteboardOnPlaying);
-            this.whiteboardEventEmitter.removeListener("ended", whiteboardOnEnded);
-            this.videoJS!.off("seeking", videoOnSeeking);
-            this.videoJS!.off("pause", videoOnPause);
-            this.videoJS!.off("playing", videoOnPlaying);
-            this.videoJS!.off("ended", videoOnEnded);
+            this.whiteboardEmitter.removeListener("buffering", whiteboardOnBuffering);
+            this.whiteboardEmitter.removeListener("pause", whiteboardOnPause);
+            this.whiteboardEmitter.removeListener("playing", whiteboardOnPlaying);
+            this.whiteboardEmitter.removeListener("ended", whiteboardOnEnded);
+            this.video.off("seeking", videoOnSeeking);
+            this.video.off("pause", videoOnPause);
+            this.video.off("playing", videoOnPlaying);
+            this.video.off("ended", videoOnEnded);
         };
 
         this.stateMachine.one(CombinePlayerStatus.Disabled, (_previous, _current, done): void => {
@@ -977,33 +950,33 @@ export default class CombinePlayer {
 
                 // 如果当前 seek 的时间没有超过 whiteboard，并且 当前 video 状态为 ended 时，才对 whiteboard 调用暂停。否则不需要
                 if (video === AtomPlayerStatus.Ended && ms < whiteboardDuration) {
-                    this.whiteboard!.pause();
+                    this.whiteboard.pause();
                 } else if (whiteboard === AtomPlayerStatus.Ended && ms < videoDuration) {
-                    this.videoJS!.pause();
+                    this.video.pause();
                 }
 
                 done();
             },
         );
 
-        this.videoJS!.one("seeking", videoOnSeeking);
+        this.video.one("seeking", videoOnSeeking);
 
-        this.videoJS!.one("pause", videoOnPause);
+        this.video.one("pause", videoOnPause);
 
-        this.videoJS!.one("playing", videoOnPlaying);
+        this.video.one("playing", videoOnPlaying);
 
-        this.videoJS!.one("ended", videoOnEnded);
+        this.video.one("ended", videoOnEnded);
 
-        this.whiteboardEventEmitter.one("buffering", whiteboardOnBuffering);
+        this.whiteboardEmitter.one("buffering", whiteboardOnBuffering);
 
-        this.whiteboardEventEmitter.one("pause", whiteboardOnPause);
+        this.whiteboardEmitter.one("pause", whiteboardOnPause);
 
-        this.whiteboardEventEmitter.one("playing", whiteboardOnPlaying);
+        this.whiteboardEmitter.one("playing", whiteboardOnPlaying);
 
-        this.whiteboardEventEmitter.one("ended", whiteboardOnEnded);
+        this.whiteboardEmitter.one("ended", whiteboardOnEnded);
 
-        this.whiteboard!.seekToProgressTime(ms);
-        this.videoJS!.currentTime(ms / 1000);
+        this.whiteboard.seekToProgressTime(ms);
+        this.video.currentTime(ms / 1000);
     }
 
     /**
@@ -1020,8 +993,8 @@ export default class CombinePlayer {
             [CombinePlayerStatus.Pause, CombinePlayerStatus.Ended],
         );
 
-        const whiteboardDuration = this.whiteboard!.timeDuration;
-        const videoDuration = this.videoJS!.duration() * 1000;
+        const whiteboardDuration = this.whiteboard.timeDuration;
+        const videoDuration = this.video.duration() * 1000;
 
         const videoOnSeeking = (): void => {
             this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.PauseSeeking);
@@ -1048,12 +1021,12 @@ export default class CombinePlayer {
         };
 
         const clearVideoAndWhiteboardEvents = (): void => {
-            this.videoJS!.off("seeking", videoOnSeeking);
-            this.videoJS!.off("canplay", videoOnCanplay);
-            this.videoJS!.off("ended", videoOnEnded);
-            this.whiteboardEventEmitter.removeListener("buffering", whiteboardOnBuffering);
-            this.whiteboardEventEmitter.removeListener("pause", whiteboardOnPause);
-            this.whiteboardEventEmitter.removeListener("ended", whiteboardOnEnded);
+            this.video.off("seeking", videoOnSeeking);
+            this.video.off("canplay", videoOnCanplay);
+            this.video.off("ended", videoOnEnded);
+            this.whiteboardEmitter.removeListener("buffering", whiteboardOnBuffering);
+            this.whiteboardEmitter.removeListener("pause", whiteboardOnPause);
+            this.whiteboardEmitter.removeListener("ended", whiteboardOnEnded);
         };
 
         this.stateMachine.one(CombinePlayerStatus.Disabled, (_previous, _current, done): void => {
@@ -1109,27 +1082,27 @@ export default class CombinePlayer {
             next();
         });
 
-        this.videoJS!.one("seeking", videoOnSeeking);
+        this.video.one("seeking", videoOnSeeking);
 
         // 在 pause 状态时，如果 video seek 完成，最终的事件是 canplay 事件，而非 pause 事件
-        this.videoJS!.one("canplay", videoOnCanplay);
+        this.video.one("canplay", videoOnCanplay);
 
-        this.videoJS!.one("ended", videoOnEnded);
+        this.video.one("ended", videoOnEnded);
 
-        this.whiteboardEventEmitter.one("buffering", whiteboardOnBuffering);
+        this.whiteboardEmitter.one("buffering", whiteboardOnBuffering);
 
-        this.whiteboardEventEmitter.one("pause", whiteboardOnPause);
+        this.whiteboardEmitter.one("pause", whiteboardOnPause);
 
-        this.whiteboardEventEmitter.one("ended", whiteboardOnEnded);
+        this.whiteboardEmitter.one("ended", whiteboardOnEnded);
 
-        this.whiteboard!.seekToProgressTime(ms);
-        this.videoJS!.currentTime(ms / 1000);
+        this.whiteboard.seekToProgressTime(ms);
+        this.video.currentTime(ms / 1000);
 
         // 这是一个 video 的 bug
         // 当 video 处于 pause 状态时，我们 seek 到视频的终点时间戳时或者超过终点时间戳时，并不会去触发 Ended，需要等 seek 结束后，再进行一次 seek，才能正确触发 Ended 事件
         if (ms >= videoDuration) {
-            this.videoJS!.one("seeked", () => {
-                this.videoJS!.currentTime(ms / 1000);
+            this.video.one("seeked", () => {
+                this.video.currentTime(ms / 1000);
             });
         }
     }
@@ -1142,17 +1115,17 @@ export default class CombinePlayer {
     private $pauseWhiteboardByVideoWaiting(next: AnyFunction): void {
         // 因为当 video 丢帧时，会触发多次的 waiting，而后面的 waiting 也会到达这里
         // 当 whiteboard 处于 pause 状态时，再次调用 pause 方法时，是不会触发 pause 事件的。所以需要提前进行判断。
-        if (this.whiteboard!.phase === "pause") {
+        if (this.whiteboard.phase === "pause") {
             this.stateMachine.setStatus(AtomPlayerSource.Whiteboard, AtomPlayerStatus.Pause);
             return next();
         }
 
-        this.whiteboardEventEmitter.one("pause", (): void => {
+        this.whiteboardEmitter.one("pause", (): void => {
             this.stateMachine.setStatus(AtomPlayerSource.Whiteboard, AtomPlayerStatus.Pause);
             next();
         });
 
-        this.whiteboard!.pause();
+        this.whiteboard.pause();
     }
 
     /**
@@ -1167,7 +1140,7 @@ export default class CombinePlayer {
         // 而 whiteboard seek 校准时，会触发: buffering -> pause(因为在调用此函数之前，我们是能够保证 whiteboard 一定是暂停状态，所以 whiteboard seek 完成后，就一定会回到 pause 状态)
         // 当 whiteboard 到达 pause 时(此时 video 也是处于 pause 状态)，我们就可以使用插件的 play 方法，来间接调用 $playByPauseBuffering 方法，让其播放
         if (isDropFrame) {
-            this.whiteboardEventEmitter.one("pause", (): void => {
+            this.whiteboardEmitter.one("pause", (): void => {
                 // 因为当我们对 whiteboard 进行 seek 后，如果后面调用播放，会先进入 buffering 阶段。所以这里设置 whiteboard 状态 为 pause-buffering 状态
                 this.stateMachine.setStatus(
                     AtomPlayerSource.Whiteboard,
@@ -1177,12 +1150,12 @@ export default class CombinePlayer {
                 next();
             });
 
-            this.videoJS!.one("pause", (): void => {
+            this.video.one("pause", (): void => {
                 this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
-                this.whiteboard!.seekToProgressTime(this.videoJS!.currentTime() * 1000);
+                this.whiteboard.seekToProgressTime(this.video.currentTime() * 1000);
             });
 
-            this.videoJS!.pause();
+            this.video.pause();
         } else {
             // video 在播放状态时，由于网络问题，导致 video 需要缓冲。现缓存完毕，开始让 whiteboard 播放
             this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Playing);
@@ -1196,11 +1169,11 @@ export default class CombinePlayer {
                 },
             );
 
-            this.whiteboardEventEmitter.one("playing", (): void => {
+            this.whiteboardEmitter.one("playing", (): void => {
                 this.stateMachine.setStatus(AtomPlayerSource.Whiteboard, AtomPlayerStatus.Playing);
             });
 
-            this.whiteboard!.play();
+            this.whiteboard.play();
         }
     }
 
@@ -1211,17 +1184,17 @@ export default class CombinePlayer {
      */
     private $pauseVideoByWhiteboardBuffering(next: AnyFunction): void {
         // 当 video 处于 pause 状态时，再次调用 pause 方法时，是不会触发 pause 事件的。所以需要提前进行判断。
-        if (this.videoJS!.paused()) {
+        if (this.video.paused()) {
             this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
             return next();
         }
 
-        this.videoJS!.one("pause", (): void => {
+        this.video.one("pause", (): void => {
             this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
             next();
         });
 
-        this.videoJS!.pause();
+        this.video.pause();
     }
 
     /**
@@ -1231,7 +1204,7 @@ export default class CombinePlayer {
      */
     private $playingVideoByWhiteboardPlaying(next: AnyFunction): void {
         this.stateMachine.one(CombinePlayerStatus.ToPlay, (_previous, _current, done): void => {
-            this.videoJS!.play();
+            this.video.play();
             done();
         });
 
@@ -1241,7 +1214,7 @@ export default class CombinePlayer {
             next();
         });
 
-        this.videoJS!.one("playing", (): void => {
+        this.video.one("playing", (): void => {
             this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Playing);
         });
 
@@ -1260,11 +1233,11 @@ export default class CombinePlayer {
             next();
         });
 
-        this.videoJS!.one("pause", (): void => {
+        this.video.one("pause", (): void => {
             this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
         });
 
-        this.videoJS!.pause();
+        this.video.pause();
     }
 
     /**
@@ -1279,11 +1252,11 @@ export default class CombinePlayer {
             next();
         });
 
-        this.whiteboardEventEmitter.one("pause", (): void => {
+        this.whiteboardEmitter.one("pause", (): void => {
             this.stateMachine.setStatus(AtomPlayerSource.Whiteboard, AtomPlayerStatus.Pause);
         });
 
-        this.whiteboard!.pause();
+        this.whiteboard.pause();
     }
 
     /**
@@ -1303,6 +1276,6 @@ export default class CombinePlayer {
      */
     private videoIsCanplay(): boolean {
         // 此状态见: https://developer.mozilla.org/zh-CN/docs/Web/API/HTMLMediaElement/readyState
-        return this.videoJS!.readyState() > 2;
+        return this.video.readyState() > 2;
     }
 }
