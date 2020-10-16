@@ -1,6 +1,6 @@
 import videojs, { VideoJsPlayer } from "video.js";
 import { Player } from "white-web-sdk";
-import { AnyFunction, PublicCombinedStatus, VideoOptions } from "./Types";
+import { AnyFunction, CombinePlayer, PublicCombinedStatus, VideoOptions } from "./Types";
 import { StateMachine } from "./StateMachine";
 import {
     CombinePlayerStatus,
@@ -20,12 +20,11 @@ import {
     ACCIDENT_ENTERED_DISABLED_BY_VIDEO_IS_PAUSE_BUFFERING,
     ACCIDENT_ENTERED_DISABLED_BY_WHITEBOARDER_IS_PAUSE_BUFFERING,
 } from "./ErrorConstant";
-import { CombinePlayerFactory } from "./CombinePlayerFactory";
 
 // 记录最后一次的公开状态，防止多发
 let lastPublicCombinedStatus: PublicCombinedStatus = CombinePlayerStatus.PauseBuffering;
 
-export default class CombinePlayer {
+export default class CombinePlayerImplement implements CombinePlayer {
     private readonly video: VideoJsPlayer;
     private readonly whiteboard: Player;
     private readonly videoOptions: VideoOptions;
@@ -40,13 +39,20 @@ export default class CombinePlayer {
 
     /**
      * 实例化 Combine-Player 插件
-     * @param {CombinePlayerFactory} combinePlayerFactory - 用于获取 video、whiteboard 对象
+     * @param {VideoOptions} videoOptions - video 配置项
+     * @param {Player} whiteboard - 回放对象
+     * @param {EventEmitter} whiteboardEmitter -
      * @param {boolean} [debug=false] - 是否开启 debug 日志
      */
-    public constructor(combinePlayerFactory: CombinePlayerFactory, debug: boolean = false) {
-        this.videoOptions = combinePlayerFactory.getVideo();
-        this.whiteboard = combinePlayerFactory.getWhiteboard();
-        this.whiteboardEmitter = combinePlayerFactory.getWhiteboardEmitter();
+    public constructor(
+        videoOptions: VideoOptions,
+        whiteboard: Player,
+        whiteboardEmitter: EventEmitter,
+        debug: boolean = false,
+    ) {
+        this.videoOptions = videoOptions;
+        this.whiteboard = whiteboard;
+        this.whiteboardEmitter = whiteboardEmitter;
 
         this.stateMachine = new StateMachine(debug);
 

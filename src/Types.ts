@@ -57,3 +57,11 @@ export type CombinePlayerStatusTransfer = {
     readonly previous: CombinePlayerStatus;
     readonly current: CombinePlayerStatus;
 };
+
+export interface CombinePlayer {
+    on(cb: (status: PublicCombinedStatus, message?: string) => any): void;
+    getStatus(): PublicCombinedStatus;
+    play(): void;
+    pause(): void;
+    seek(ms: number): void;
+}

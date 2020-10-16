@@ -1,25 +1,12 @@
-import { VideoDefaultOptions, VideoOptions } from "./Types";
+import { CombinePlayer, VideoDefaultOptions, VideoOptions } from "./Types";
 import { verifyInstanceParams } from "./Verification";
 import { Player, PlayerPhase } from "white-web-sdk";
 import { EventEmitter } from "./EventEmitter";
-
-/**
- * 实例化时默认传参
- * @private
- * @return DefaultOptions
- */
-const videoDefaultOptions = (): VideoDefaultOptions => {
-    return {
-        videoDOM: document.createElement("video"),
-        videoJsOptions: {
-            preload: "auto",
-        },
-    };
-};
+import CombinePlayerImplement from "./index";
 
 export class CombinePlayerFactory {
     private readonly videoOptions: VideoOptions;
-    private whiteboard: Player | undefined = undefined;
+    private whiteboard?: Player = undefined;
     private readonly whiteboardEmitter: EventEmitter = new EventEmitter();
 
     /**
@@ -29,7 +16,7 @@ export class CombinePlayerFactory {
     public constructor(videoOptions: VideoOptions) {
         verifyInstanceParams(videoOptions);
 
-        const _videoDefaultOptions = videoDefaultOptions();
+        const _videoDefaultOptions = CombinePlayerFactory.videoDefaultOptions();
         this.videoOptions = {
             ..._videoDefaultOptions,
             ...videoOptions,
@@ -46,42 +33,49 @@ export class CombinePlayerFactory {
      */
     public setWhiteboard(whiteboard: Player): void {
         this.whiteboard = whiteboard;
+        this.handleWhiteboardCallback();
     }
 
     /**
-     * 获取 whiteboard 的 Player 对象
+     * 创建 CombinePlayer 对象
+     * @param {boolean} [debug=false] - 是否开启 debug 日志
      */
-    public getWhiteboard(): Player {
-        return this.whiteboard as Player;
+    public create(debug: boolean = false): CombinePlayer {
+        if (!this.whiteboard) {
+            throw Error(
+                "Before creating, you must first use setWhiteboard to pass in whiteboard object",
+            );
+        }
+
+        return new CombinePlayerImplement(
+            this.videoOptions,
+            this.whiteboard,
+            this.whiteboardEmitter,
+            debug,
+        );
+    }
+
+    private handleWhiteboardCallback(): void {
+        // 设置 whiteboard 的事件回调
+        this.whiteboard!.callbacks.on("onPhaseChanged", (phase: PlayerPhase): void => {
+            this.whiteboardEmitter.emit(phase);
+        });
+
+        // 设置 whiteboard 的 isPlayable 事件
+        this.whiteboard!.callbacks.on("onIsPlayableChanged", (isPlayable: boolean): void => {
+            this.whiteboardEmitter.emit("playableChange", isPlayable);
+        });
     }
 
     /**
-     * 获取 video 配置项
+     * 实例化时默认的 video 传参
      */
-    public getVideo(): VideoOptions {
-        return this.videoOptions;
-    }
-
-    /**
-     *  获取 whiteboard 的 EventEmitter 对象
-     */
-    public getWhiteboardEmitter(): EventEmitter {
-        return this.whiteboardEmitter;
-    }
-
-    /**
-     * 设置白板的事件回调
-     * @param {PlayerPhase} phase - 事件名称
-     */
-    public setWhiteboardEvents(phase: PlayerPhase): void {
-        this.whiteboardEmitter.emit(phase);
-    }
-
-    /**
-     * 设置 回放 的 isPlayable 事件
-     * @param {boolean} isPlayable - 是否可播放
-     */
-    public setWhiteboardIsPlayable(isPlayable: boolean): void {
-        this.whiteboardEmitter.emit("playableChange", isPlayable);
+    public static videoDefaultOptions(): VideoDefaultOptions {
+        return {
+            videoDOM: document.createElement("video"),
+            videoJsOptions: {
+                preload: "auto",
+            },
+        };
     }
 }
