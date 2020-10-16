@@ -14,4 +14,4 @@ export const ACCIDENT_ENTERED_DISABLED_BY_SEEKING_PLAYING =
 export const ACCIDENT_ENTERED_DISABLED_BY_SEEKING_PAUSE =
     "When video and whiteboard are pause, perform seek operation and accidentally enter the prohibited area";
 export const ACCIDENT_ENTERED_DISABLED_BY_ENDED =
-    "When video or whiteboard are Eeded, they accidentally enter the prohibited area";
+    "When video or whiteboard are Ended, they accidentally enter the prohibited area";
