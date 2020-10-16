@@ -8,7 +8,7 @@ export enum AtomPlayerStatus {
     Ended,
 }
 
-export enum CombineStatus {
+export enum CombinePlayerStatus {
     PauseSeeking = "PauseSeeking",
     PlayingSeeking = "PlayingSeeking",
     PauseBuffering = "PauseBuffering",

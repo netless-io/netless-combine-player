@@ -1,5 +1,5 @@
 import { debugLog } from "./Log";
-import { CombineStatus, AtomPlayerSource, AtomPlayerStatus } from "./StatusContant";
+import { CombinePlayerStatus, AtomPlayerSource, AtomPlayerStatus } from "./StatusContant";
 import {
     CombinationStatusData,
     EmptyCallback,
@@ -20,11 +20,11 @@ const emptyFnHandler = (_previous: Mixing, _current: Mixing, done: EmptyCallback
 // 设置默认的 组合状态触发器
 const defaultCombineStatusHandler = (): EventList => {
     const result = {} as EventList;
-    const keys = Object.keys(CombineStatus);
+    const keys = Object.keys(CombinePlayerStatus);
     const len = keys.length;
 
     for (let i = 0; i < len; i++) {
-        const key = keys[i] as CombineStatus;
+        const key = keys[i] as CombinePlayerStatus;
         result[key] = {
             handler: emptyFnHandler,
             once: false,
@@ -71,10 +71,10 @@ export class StateMachine {
 
     /**
      * 监听组合状态变更回调，只运行一次
-     * @param {CombineStatus} eventName - 需要监听的组合状态名
+     * @param {CombinePlayerStatus} eventName - 需要监听的组合状态名
      * @param {OnEventCallback} cb - 事件回调
      */
-    public one(eventName: CombineStatus, cb: OnEventCallback): void {
+    public one(eventName: CombinePlayerStatus, cb: OnEventCallback): void {
         this.events[eventName] = {
             handler: cb,
             once: true,
@@ -83,10 +83,10 @@ export class StateMachine {
 
     /**
      * 监听组合状态变更回调
-     * @param {CombineStatus} eventName - 需要监听的组合状态名
+     * @param {CombinePlayerStatus} eventName - 需要监听的组合状态名
      * @param {OnEventCallback} cb - 事件回调
      */
-    public on(eventName: CombineStatus, cb: OnEventCallback): void {
+    public on(eventName: CombinePlayerStatus, cb: OnEventCallback): void {
         this.events[eventName] = {
             handler: cb,
             once: false,
@@ -95,9 +95,9 @@ export class StateMachine {
 
     /**
      * 解除监听器
-     * @param {CombineStatus | CombineStatus[]} eventName - 需要取消监听的组合状态名
+     * @param {CombinePlayerStatus | CombinePlayerStatus[]} eventName - 需要取消监听的组合状态名
      */
-    public off(eventName: CombineStatus | CombineStatus[]): void {
+    public off(eventName: CombinePlayerStatus | CombinePlayerStatus[]): void {
         if (typeof eventName === "string") {
             this.events[eventName] = {
                 handler: emptyFnHandler,
@@ -165,12 +165,12 @@ export class StateMachine {
 
     /**
      * 开启 状态锁
-     * @param {CombineStatus[]} allowStatusList - 允许进入的组合状态名列表
-     * @param {CombineStatus[]} unLockStatusList - 解锁的组合状态名列表
+     * @param {CombinePlayerStatus[]} allowStatusList - 允许进入的组合状态名列表
+     * @param {CombinePlayerStatus[]} unLockStatusList - 解锁的组合状态名列表
      */
     public lockCombineStatus(
-        allowStatusList: CombineStatus[],
-        unLockStatusList: CombineStatus[],
+        allowStatusList: CombinePlayerStatus[],
+        unLockStatusList: CombinePlayerStatus[],
     ): void {
         // 如果当前已经有锁，则跳过，不再进行设置
         if (this.statusLockInfo.isLocked) {
@@ -285,7 +285,7 @@ export class StateMachine {
      * @private
      */
     private initTables(): Table {
-        const generateTable = (combineStatus: CombineStatus): GenerateTable => {
+        const generateTable = (combineStatus: CombinePlayerStatus): GenerateTable => {
             return (
                 whiteboardStatus: AtomPlayerStatus,
                 videoStatus: AtomPlayerStatus,
@@ -298,16 +298,16 @@ export class StateMachine {
             };
         };
 
-        const pauseSeeking = generateTable(CombineStatus.PauseSeeking);
-        const playingSeeking = generateTable(CombineStatus.PlayingSeeking);
-        const pauseBuffering = generateTable(CombineStatus.PauseBuffering);
-        const playingBuffering = generateTable(CombineStatus.PlayingBuffering);
-        const toPlay = generateTable(CombineStatus.ToPlay);
-        const toPause = generateTable(CombineStatus.ToPause);
-        const pause = generateTable(CombineStatus.Pause);
-        const playing = generateTable(CombineStatus.Playing);
-        const disabled = generateTable(CombineStatus.Disabled);
-        const ended = generateTable(CombineStatus.Ended);
+        const pauseSeeking = generateTable(CombinePlayerStatus.PauseSeeking);
+        const playingSeeking = generateTable(CombinePlayerStatus.PlayingSeeking);
+        const pauseBuffering = generateTable(CombinePlayerStatus.PauseBuffering);
+        const playingBuffering = generateTable(CombinePlayerStatus.PlayingBuffering);
+        const toPlay = generateTable(CombinePlayerStatus.ToPlay);
+        const toPause = generateTable(CombinePlayerStatus.ToPause);
+        const pause = generateTable(CombinePlayerStatus.Pause);
+        const playing = generateTable(CombinePlayerStatus.Playing);
+        const disabled = generateTable(CombinePlayerStatus.Disabled);
+        const ended = generateTable(CombinePlayerStatus.Ended);
 
         // prettier-ignore
         return Object.freeze([
