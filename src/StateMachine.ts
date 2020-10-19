@@ -6,6 +6,7 @@ import {
     AtomPlayerStatusPair,
     OnEventCallback,
     AtomPlayerStatusTransfer,
+    AtomPlayerStatusCompose,
 } from "./Types";
 import { EventEmitter } from "./EventEmitter";
 
@@ -47,10 +48,17 @@ export class StateMachine {
     /**
      * 监听组合状态变更回调，只运行一次
      * @param {CombinePlayerStatus} eventName - 需要监听的组合状态名
-     * @param {OnEventCallback} cb - 事件回调
      */
-    public one(eventName: CombinePlayerStatus, cb: OnEventCallback): void {
-        this.events.one(eventName, cb);
+    public one(eventName: CombinePlayerStatus): Promise<AtomPlayerStatusCompose> {
+        return new Promise(resolve => {
+            this.events.one(eventName, (previous, current, done) => {
+                done();
+                resolve({
+                    previous,
+                    current,
+                });
+            });
+        });
     }
 
     /**

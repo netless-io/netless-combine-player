@@ -15,6 +15,11 @@ export type AtomPlayerStatusPair = {
     readonly video: AtomPlayerStatus;
 };
 
+export type AtomPlayerStatusCompose = {
+    previous: AtomPlayerStatusPair;
+    current: AtomPlayerStatusPair;
+};
+
 export type OnEventCallback = (
     previous: AtomPlayerStatusPair,
     current: AtomPlayerStatusPair,
