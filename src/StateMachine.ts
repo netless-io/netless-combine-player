@@ -175,16 +175,18 @@ export class StateMachine {
      */
     public getStatus(source: AtomPlayerSource): AtomPlayerStatusTransfer {
         switch (source) {
-            case AtomPlayerSource.Video:
+            case AtomPlayerSource.Video: {
                 return {
                     previous: this.videoStatus.previous,
                     current: this.videoStatus.current,
                 };
-            case AtomPlayerSource.Whiteboard:
+            }
+            case AtomPlayerSource.Whiteboard: {
                 return {
                     previous: this.whiteboardStatus.previous,
                     current: this.whiteboardStatus.current,
                 };
+            }
         }
     }
 
