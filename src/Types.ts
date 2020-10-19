@@ -54,8 +54,10 @@ export type CombinePlayerStatusTransfer = {
     readonly current: CombinePlayerStatus;
 };
 
+export type StatusChangeHandle = (status: PublicCombinedStatus, message?: string) => any;
+
 export interface CombinePlayer {
-    onStatusChange(cb: (status: PublicCombinedStatus, message?: string) => any): void;
+    setOnStatusChange(cb: StatusChangeHandle): void;
     getStatus(): PublicCombinedStatus;
     play(): void;
     pause(): void;

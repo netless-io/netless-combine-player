@@ -1,6 +1,12 @@
 import { VideoJsPlayer } from "video.js";
 import { Player } from "white-web-sdk";
-import { AnyFunction, CombinePlayer, PublicCombinedStatus, VideoOptions } from "./Types";
+import {
+    AnyFunction,
+    CombinePlayer,
+    PublicCombinedStatus,
+    StatusChangeHandle,
+    VideoOptions,
+} from "./Types";
 import { StateMachine } from "./StateMachine";
 import {
     CombinePlayerStatus,
@@ -27,7 +33,7 @@ export class CombinePlayerImplement implements CombinePlayer {
     private readonly videoOptions: VideoOptions;
     private readonly stateMachine: StateMachine;
 
-    private onStatusUpdate: (status: PublicCombinedStatus, message?: string) => any = () => {};
+    private readonly onStatusUpdate: StatusChangeHandle = () => {};
 
     private triggerSource: TriggerSource = TriggerSource.None;
 
@@ -35,6 +41,8 @@ export class CombinePlayerImplement implements CombinePlayer {
 
     private readonly whiteboardEmitter: EventEmitter;
     private readonly taskQueue: TaskQueue = new TaskQueue();
+
+    private onStatusChangeHandleList: StatusChangeHandle[] = [];
 
     /**
      * 实例化 Combine-Player 插件
@@ -47,6 +55,20 @@ export class CombinePlayerImplement implements CombinePlayer {
         this.whiteboard = whiteboard;
         this.whiteboardEmitter = whiteboardEmitter;
 
+        this.onStatusUpdate = (status, message?): void => {
+            if (this.currentCombineStatus !== status) {
+                this.currentCombineStatus = status;
+
+                // 使用 Promise 封装一层，转为异步，以保证用户传入的参数不会影响到插件本身。
+                // 因为如果用户的回调里存在着阻塞代码，也会影响到插件本身
+                Promise.resolve().then((): void => {
+                    this.onStatusChangeHandleList.forEach(cb => {
+                        cb(status, message);
+                    });
+                });
+            }
+        };
+
         this.stateMachine = new StateMachine(debug);
 
         this.initVideo(videoConfig.isCanplay);
@@ -55,18 +77,27 @@ export class CombinePlayerImplement implements CombinePlayer {
 
     /**
      * 状态通知监听
-     * @param {(status: PublicCombinedStatus) => any} cb - 状态发生回调
+     * @param {StatusChangeHandle} cb - 状态发生回调
      */
-    public onStatusChange(cb: (status: PublicCombinedStatus, message?: string) => any): void {
-        // 使用 Promise 封装一层，转为异步，以保证用户传入的参数不会影响到插件本身。
-        this.onStatusUpdate = (status, message?): void => {
-            if (this.currentCombineStatus !== status) {
-                this.currentCombineStatus = status;
-                Promise.resolve().then((): void => {
-                    cb(status, message);
-                });
-            }
-        };
+    public setOnStatusChange(cb: StatusChangeHandle): void {
+        this.onStatusChangeHandleList.push(cb);
+    }
+
+    /**
+     * 移除指定的状态通知回调
+     * @param {StatusChangeHandle} cb - 要移除的状态通知回调
+     */
+    public removeStatusChange(cb: StatusChangeHandle): void {
+        this.onStatusChangeHandleList = this.onStatusChangeHandleList.filter(fn => {
+            return fn !== cb;
+        });
+    }
+
+    /**
+     * 移除所有的状态通知回调
+     */
+    public removeAllStatusChange(): void {
+        this.onStatusChangeHandleList = [];
     }
 
     /**
@@ -79,25 +110,22 @@ export class CombinePlayerImplement implements CombinePlayer {
     /**
      * 插件的播放处理
      */
-    public async play(): Promise<void> {
-        await this.taskQueue.append(
-            (): Promise<void> => {
-                return new Promise(async resolve => {
-                    await this.setTriggerSource(TriggerSource.Plugin);
+    public play(): void {
+        this.taskQueue.append(
+            async (): Promise<void> => {
+                this.setTriggerSource(TriggerSource.Plugin);
 
-                    const currentCombinedStatus = this.stateMachine.getCombinationStatus().current;
+                const currentCombinedStatus = this.stateMachine.getCombinationStatus().current;
 
-                    if (currentCombinedStatus === CombinePlayerStatus.Pause) {
-                        await this.playByPause();
-                    } else if (currentCombinedStatus === CombinePlayerStatus.PauseBuffering) {
-                        await this.playByPauseBuffering();
-                    } else if (currentCombinedStatus === CombinePlayerStatus.Ended) {
-                        await this.playByEnded();
-                    }
+                if (currentCombinedStatus === CombinePlayerStatus.Pause) {
+                    await this.playByPause();
+                } else if (currentCombinedStatus === CombinePlayerStatus.PauseBuffering) {
+                    await this.playByPauseBuffering();
+                } else if (currentCombinedStatus === CombinePlayerStatus.Ended) {
+                    await this.playByEnded();
+                }
 
-                    await this.setTriggerSource(TriggerSource.None);
-                    resolve();
-                });
+                this.setTriggerSource(TriggerSource.None);
             },
         );
     }
@@ -105,20 +133,17 @@ export class CombinePlayerImplement implements CombinePlayer {
     /**
      * 插件的暂停处理
      */
-    public async pause(): Promise<void> {
-        await this.taskQueue.append(
-            (): Promise<void> => {
-                return new Promise(async resolve => {
-                    await this.setTriggerSource(TriggerSource.Plugin);
+    public pause(): void {
+        this.taskQueue.append(
+            async (): Promise<void> => {
+                this.setTriggerSource(TriggerSource.Plugin);
 
-                    const currentCombinedStatus = this.stateMachine.getCombinationStatus().current;
-                    if (currentCombinedStatus === CombinePlayerStatus.Playing) {
-                        await this.pauseByPlaying();
-                    }
+                const currentCombinedStatus = this.stateMachine.getCombinationStatus().current;
+                if (currentCombinedStatus === CombinePlayerStatus.Playing) {
+                    await this.pauseByPlaying();
+                }
 
-                    await this.setTriggerSource(TriggerSource.None);
-                    resolve();
-                });
+                this.setTriggerSource(TriggerSource.None);
             },
         );
     }
@@ -126,29 +151,26 @@ export class CombinePlayerImplement implements CombinePlayer {
     /**
      * 用户调用 seek 时的处理
      */
-    public async seek(ms: number): Promise<void> {
-        await this.taskQueue.append(
-            (): Promise<void> => {
-                return new Promise(async resolve => {
-                    await this.setTriggerSource(TriggerSource.Plugin);
+    public seek(ms: number): void {
+        this.taskQueue.append(
+            async (): Promise<void> => {
+                this.setTriggerSource(TriggerSource.Plugin);
 
-                    const currentCombinedStatus = this.stateMachine.getCombinationStatus().current;
+                const currentCombinedStatus = this.stateMachine.getCombinationStatus().current;
 
-                    if (currentCombinedStatus === CombinePlayerStatus.Playing) {
-                        await this.seekByPlaying(ms);
-                    } else if (
-                        [
-                            CombinePlayerStatus.Pause,
-                            CombinePlayerStatus.PauseBuffering,
-                            CombinePlayerStatus.Ended,
-                        ].includes(currentCombinedStatus)
-                    ) {
-                        await this.seekByPause(ms);
-                    }
+                if (currentCombinedStatus === CombinePlayerStatus.Playing) {
+                    await this.seekByPlaying(ms);
+                } else if (
+                    [
+                        CombinePlayerStatus.Pause,
+                        CombinePlayerStatus.PauseBuffering,
+                        CombinePlayerStatus.Ended,
+                    ].includes(currentCombinedStatus)
+                ) {
+                    await this.seekByPause(ms);
+                }
 
-                    await this.setTriggerSource(TriggerSource.None);
-                    resolve();
-                });
+                this.setTriggerSource(TriggerSource.None);
             },
         );
     }
@@ -189,11 +211,9 @@ export class CombinePlayerImplement implements CombinePlayer {
                     this.triggerSource === TriggerSource.None ||
                     this.triggerSource === TriggerSource.Video
                 ) {
-                    await this.taskQueue.append(
-                        (): Promise<void> => {
-                            return this.setTriggerSource(TriggerSource.Video);
-                        },
-                    );
+                    await this.taskQueue.append((): void => {
+                        this.setTriggerSource(TriggerSource.Video);
+                    });
                     await cb();
                 }
             };
@@ -237,11 +257,9 @@ export class CombinePlayerImplement implements CombinePlayer {
                             return this.pauseWhiteboardByVideoWaiting();
                         },
                     );
-                    await this.taskQueue.append(
-                        (): Promise<void> => {
-                            return this.setTriggerSource(TriggerSource.None);
-                        },
-                    );
+                    await this.taskQueue.append((): void => {
+                        this.setTriggerSource(TriggerSource.None);
+                    });
                 },
             ),
         );
@@ -255,11 +273,9 @@ export class CombinePlayerImplement implements CombinePlayer {
                             return this.playingWhiteboardByVideoPlaying(isDropFrame);
                         },
                     );
-                    await this.taskQueue.append(
-                        (): Promise<void> => {
-                            return this.setTriggerSource(TriggerSource.None);
-                        },
-                    );
+                    await this.taskQueue.append((): void => {
+                        this.setTriggerSource(TriggerSource.None);
+                    });
                     isDropFrame = false;
                 },
             ),
@@ -274,11 +290,9 @@ export class CombinePlayerImplement implements CombinePlayer {
                             return this.pauseWhiteboardByVideoEnded();
                         },
                     );
-                    await this.taskQueue.append(
-                        (): Promise<void> => {
-                            return this.setTriggerSource(TriggerSource.None);
-                        },
-                    );
+                    await this.taskQueue.append((): void => {
+                        this.setTriggerSource(TriggerSource.None);
+                    });
                 },
             ),
         );
@@ -329,11 +343,9 @@ export class CombinePlayerImplement implements CombinePlayer {
                     this.triggerSource === TriggerSource.None ||
                     this.triggerSource === TriggerSource.Whiteboard
                 ) {
-                    await this.taskQueue.append(
-                        (): Promise<void> => {
-                            return this.setTriggerSource(TriggerSource.Whiteboard);
-                        },
-                    );
+                    await this.taskQueue.append((): void => {
+                        this.setTriggerSource(TriggerSource.Whiteboard);
+                    });
                     await cb();
                 }
             };
@@ -353,11 +365,9 @@ export class CombinePlayerImplement implements CombinePlayer {
                             return this.pauseVideoByWhiteboardBuffering();
                         },
                     );
-                    await this.taskQueue.append(
-                        (): Promise<void> => {
-                            return this.setTriggerSource(TriggerSource.None);
-                        },
-                    );
+                    await this.taskQueue.append((): void => {
+                        this.setTriggerSource(TriggerSource.None);
+                    });
                 },
             ),
         );
@@ -371,11 +381,9 @@ export class CombinePlayerImplement implements CombinePlayer {
                             return this.playingVideoByWhiteboardPlaying();
                         },
                     );
-                    await this.taskQueue.append(
-                        (): Promise<void> => {
-                            return this.setTriggerSource(TriggerSource.None);
-                        },
-                    );
+                    await this.taskQueue.append((): void => {
+                        this.setTriggerSource(TriggerSource.None);
+                    });
                 },
             ),
         );
@@ -389,11 +397,9 @@ export class CombinePlayerImplement implements CombinePlayer {
                             return this.pauseVideoByWhiteboardEnded();
                         },
                     );
-                    await this.taskQueue.append(
-                        (): Promise<void> => {
-                            return this.setTriggerSource(TriggerSource.None);
-                        },
-                    );
+                    await this.taskQueue.append((): void => {
+                        this.setTriggerSource(TriggerSource.None);
+                    });
                 },
             ),
         );
@@ -1315,9 +1321,8 @@ export class CombinePlayerImplement implements CombinePlayer {
      * @param {TriggerSource} source - 修改源
      * @private
      */
-    private setTriggerSource(source: TriggerSource): Promise<void> {
+    private setTriggerSource(source: TriggerSource): void {
         this.triggerSource = source;
-        return Promise.resolve();
     }
 }
 
