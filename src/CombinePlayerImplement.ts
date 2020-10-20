@@ -809,6 +809,10 @@ export class CombinePlayerImplement implements CombinePlayer {
                 this.stateMachine.setStatus(AtomPlayerSource.Whiteboard, AtomPlayerStatus.Pause);
             };
 
+            const whiteboardOnPlaying = (): void => {
+                this.whiteboard.pause();
+            };
+
             const videoOnCanplay = (): void => {
                 this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
             };
@@ -833,6 +837,7 @@ export class CombinePlayerImplement implements CombinePlayer {
             );
 
             this.whiteboardEmitter.one("pause", whiteboardOnPause);
+            this.whiteboardEmitter.one("playing", whiteboardOnPlaying);
 
             this.video.one("canplay", videoOnCanplay);
 
