@@ -1,6 +1,6 @@
 module.exports = {
     parser: "@typescript-eslint/parser",
-    plugins: ["prettier", "@typescript-eslint"],
+    plugins: ["@netless", "prettier", "@typescript-eslint"],
     parserOptions: {
         project: "./tsconfig.json",
         sourceType: "module",
@@ -34,6 +34,7 @@ module.exports = {
         "no-var": ["error"],
         semi: ["error", "always"],
         "arrow-parens": ["error", "as-needed"],
+        "@netless/case-curly-brace": ["error"],
         "@typescript-eslint/typedef": [
             "error",
             {
