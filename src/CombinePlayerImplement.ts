@@ -9,31 +9,20 @@ import {
 } from "./Types";
 import { StateMachine } from "./StateMachine";
 import {
-    CombinePlayerStatus,
     AtomPlayerSource,
     AtomPlayerStatus,
+    CombinePlayerStatus,
     TriggerSource,
 } from "./StatusContant";
 import { EventEmitter } from "./EventEmitter";
 import { TaskQueue } from "./TaskQueue";
-import {
-    ACCIDENT_ENTERED_DISABLED_BY_ALL_IS_PAUSE,
-    ACCIDENT_ENTERED_DISABLED_BY_ALL_IS_PAUSE_BUFFERING,
-    ACCIDENT_ENTERED_DISABLED_BY_ENDED,
-    ACCIDENT_ENTERED_DISABLED_BY_PLAYING,
-    ACCIDENT_ENTERED_DISABLED_BY_SEEKING_PAUSE,
-    ACCIDENT_ENTERED_DISABLED_BY_SEEKING_PLAYING,
-    ACCIDENT_ENTERED_DISABLED_BY_VIDEO_IS_PAUSE_BUFFERING,
-    ACCIDENT_ENTERED_DISABLED_BY_WHITEBOARDER_IS_PAUSE_BUFFERING,
-} from "./ErrorConstant";
+import { ACCIDENT_ENTERED_DISABLED } from "./ErrorConstant";
 
 export class CombinePlayerImplement implements CombinePlayer {
     private readonly video: VideoJsPlayer;
     private readonly whiteboard: Player;
     private readonly videoOptions: VideoOptions;
     private readonly stateMachine: StateMachine;
-
-    private readonly onStatusUpdate: StatusChangeHandle = () => {};
 
     private triggerSource: TriggerSource = TriggerSource.None;
 
@@ -55,22 +44,9 @@ export class CombinePlayerImplement implements CombinePlayer {
         this.whiteboard = whiteboard;
         this.whiteboardEmitter = whiteboardEmitter;
 
-        this.onStatusUpdate = (status, message?): void => {
-            if (this.currentCombineStatus !== status) {
-                this.currentCombineStatus = status;
-
-                // 使用 Promise 封装一层，转为异步，以保证用户传入的参数不会影响到插件本身。
-                // 因为如果用户的回调里存在着阻塞代码，也会影响到插件本身
-                Promise.resolve().then((): void => {
-                    this.onStatusChangeHandleList.forEach(cb => {
-                        cb(status, message);
-                    });
-                });
-            }
-        };
-
         this.stateMachine = new StateMachine(debug);
 
+        this.initDisabledStatusHandler();
         this.initVideo(videoConfig.isCanplay);
         this.initWhiteboard();
     }
@@ -118,11 +94,11 @@ export class CombinePlayerImplement implements CombinePlayer {
                 const currentCombinedStatus = this.stateMachine.getCombinationStatus().current;
 
                 if (currentCombinedStatus === CombinePlayerStatus.Pause) {
-                    await this.playByPause();
+                    await this.playWhenPause();
                 } else if (currentCombinedStatus === CombinePlayerStatus.PauseBuffering) {
-                    await this.playByPauseBuffering();
+                    await this.playWhenPauseBuffering();
                 } else if (currentCombinedStatus === CombinePlayerStatus.Ended) {
-                    await this.playByEnded();
+                    await this.playWhenEnded();
                 }
 
                 this.setTriggerSource(TriggerSource.None);
@@ -140,7 +116,7 @@ export class CombinePlayerImplement implements CombinePlayer {
 
                 const currentCombinedStatus = this.stateMachine.getCombinationStatus().current;
                 if (currentCombinedStatus === CombinePlayerStatus.Playing) {
-                    await this.pauseByPlaying();
+                    await this.pauseWhenPlaying();
                 }
 
                 this.setTriggerSource(TriggerSource.None);
@@ -159,7 +135,7 @@ export class CombinePlayerImplement implements CombinePlayer {
                 const currentCombinedStatus = this.stateMachine.getCombinationStatus().current;
 
                 if (currentCombinedStatus === CombinePlayerStatus.Playing) {
-                    await this.seekByPlaying(ms);
+                    await this.seekWhenPlaying(ms);
                 } else if (
                     [
                         CombinePlayerStatus.Pause,
@@ -167,7 +143,7 @@ export class CombinePlayerImplement implements CombinePlayer {
                         CombinePlayerStatus.Ended,
                     ].includes(currentCombinedStatus)
                 ) {
-                    await this.seekByPause(ms);
+                    await this.seekWhenPause(ms);
                 }
 
                 this.setTriggerSource(TriggerSource.None);
@@ -187,7 +163,7 @@ export class CombinePlayerImplement implements CombinePlayer {
         );
 
         if (!isCanplay) {
-            this.onStatusUpdate(CombinePlayerStatus.PauseBuffering);
+            this.currentCombineStatus = CombinePlayerStatus.PauseBuffering;
         }
 
         this.initVideoJSEvents();
@@ -254,7 +230,7 @@ export class CombinePlayerImplement implements CombinePlayer {
                     this.onStatusUpdate(CombinePlayerStatus.PlayingBuffering);
                     await this.taskQueue.append(
                         (): Promise<void> => {
-                            return this.pauseWhiteboardByVideoWaiting();
+                            return this.pauseWhiteboardWhenVideoWaiting();
                         },
                     );
                     await this.taskQueue.append((): void => {
@@ -270,7 +246,7 @@ export class CombinePlayerImplement implements CombinePlayer {
                 async (): Promise<void> => {
                     await this.taskQueue.append(
                         (): Promise<void> => {
-                            return this.playingWhiteboardByVideoPlaying(isDropFrame);
+                            return this.playingWhiteboardWhenVideoPlaying(isDropFrame);
                         },
                     );
                     await this.taskQueue.append((): void => {
@@ -287,7 +263,7 @@ export class CombinePlayerImplement implements CombinePlayer {
                 async (): Promise<void> => {
                     await this.taskQueue.append(
                         (): Promise<void> => {
-                            return this.pauseWhiteboardByVideoEnded();
+                            return this.pauseWhiteboardWhenVideoEnded();
                         },
                     );
                     await this.taskQueue.append((): void => {
@@ -307,7 +283,7 @@ export class CombinePlayerImplement implements CombinePlayer {
 
         // 这里 提前进行了状态机改变，因为回放在 seek 时，不会触发 Buffering 事件，所以在这里需要提前设置。以保证状态正确
         this.stateMachine.setStatus(AtomPlayerSource.Whiteboard, AtomPlayerStatus.PauseBuffering);
-        this.onStatusUpdate(CombinePlayerStatus.PauseBuffering);
+        this.currentCombineStatus = CombinePlayerStatus.PauseBuffering;
         // 先seek到第一帧，以拿到 whiteboard 的状态。否则 whiteboard 会永远在 waitingFirstFrame 状态，isPlayable 也会一直是 false
         this.whiteboard.seekToProgressTime(0);
     }
@@ -362,7 +338,7 @@ export class CombinePlayerImplement implements CombinePlayer {
                     this.onStatusUpdate(CombinePlayerStatus.PlayingBuffering);
                     await this.taskQueue.append(
                         (): Promise<void> => {
-                            return this.pauseVideoByWhiteboardBuffering();
+                            return this.pauseVideoWhenWhiteboardBuffering();
                         },
                     );
                     await this.taskQueue.append((): void => {
@@ -378,7 +354,7 @@ export class CombinePlayerImplement implements CombinePlayer {
                 async (): Promise<void> => {
                     await this.taskQueue.append(
                         (): Promise<void> => {
-                            return this.playingVideoByWhiteboardPlaying();
+                            return this.playingVideoWhenWhiteboardPlaying();
                         },
                     );
                     await this.taskQueue.append((): void => {
@@ -394,7 +370,7 @@ export class CombinePlayerImplement implements CombinePlayer {
                 async (): Promise<void> => {
                     await this.taskQueue.append(
                         (): Promise<void> => {
-                            return this.pauseVideoByWhiteboardEnded();
+                            return this.pauseVideoWhenWhiteboardEnded();
                         },
                     );
                     await this.taskQueue.append((): void => {
@@ -409,15 +385,11 @@ export class CombinePlayerImplement implements CombinePlayer {
      * 在暂停状态下，用户调用播放时的处理
      * @private
      */
-    private playByPause(): Promise<void> {
+    private playWhenPause(): Promise<void> {
         return new Promise(resolve => {
             this.stateMachine.lockCombineStatus(
-                [
-                    CombinePlayerStatus.Disabled,
-                    CombinePlayerStatus.ToPlay,
-                    CombinePlayerStatus.Playing,
-                ],
-                [CombinePlayerStatus.Playing, CombinePlayerStatus.Disabled],
+                [CombinePlayerStatus.ToPlay, CombinePlayerStatus.Playing],
+                [CombinePlayerStatus.Playing],
             );
 
             const videoOnPlaying = (): void => {
@@ -428,31 +400,19 @@ export class CombinePlayerImplement implements CombinePlayer {
                 this.stateMachine.setStatus(AtomPlayerSource.Whiteboard, AtomPlayerStatus.Playing);
             };
 
-            this.stateMachine.one(CombinePlayerStatus.Disabled).then((): void => {
-                this.onStatusUpdate(
-                    CombinePlayerStatus.Disabled,
-                    ACCIDENT_ENTERED_DISABLED_BY_ALL_IS_PAUSE,
-                );
-
-                this.taskQueue.destroy();
-                this.video.off("playing", videoOnPlaying);
-                this.whiteboardEmitter.removeListener("playing", whiteboardOnPlaying);
-                this.stateMachine.off([CombinePlayerStatus.ToPlay, CombinePlayerStatus.Playing]);
-
-                resolve();
-            });
-
-            this.stateMachine.one(CombinePlayerStatus.Playing).then((): void => {
+            this.stateMachine.one(CombinePlayerStatus.Playing).then(({ done }): void => {
                 this.onStatusUpdate(CombinePlayerStatus.Playing);
-                this.stateMachine.off(CombinePlayerStatus.Disabled);
 
+                done();
                 resolve();
             });
 
             this.whiteboardEmitter.one("playing", whiteboardOnPlaying);
 
-            this.stateMachine.one(CombinePlayerStatus.ToPlay).then((): void => {
+            this.stateMachine.one(CombinePlayerStatus.ToPlay).then(({ done }): void => {
                 this.whiteboard.play();
+
+                done();
             });
 
             this.video.one("playing", videoOnPlaying);
@@ -466,7 +426,7 @@ export class CombinePlayerImplement implements CombinePlayer {
      * 需要主要的是，当在 pause-buffering 状态下，一共有三种情况路径
      * @private
      */
-    private playByPauseBuffering(): Promise<void> {
+    private playWhenPauseBuffering(): Promise<void> {
         return new Promise(resolve => {
             const videoStatus = this.stateMachine.getStatus(AtomPlayerSource.Video).current;
             const whiteboardStatus = this.stateMachine.getStatus(AtomPlayerSource.Whiteboard)
@@ -479,12 +439,8 @@ export class CombinePlayerImplement implements CombinePlayer {
                 whiteboardStatus === AtomPlayerStatus.Pause
             ) {
                 this.stateMachine.lockCombineStatus(
-                    [
-                        CombinePlayerStatus.Disabled,
-                        CombinePlayerStatus.ToPlay,
-                        CombinePlayerStatus.Playing,
-                    ],
-                    [CombinePlayerStatus.Playing, CombinePlayerStatus.Disabled],
+                    [CombinePlayerStatus.ToPlay, CombinePlayerStatus.Playing],
+                    [CombinePlayerStatus.Playing],
                 );
 
                 const videoOnPlay = (): void => {
@@ -505,31 +461,16 @@ export class CombinePlayerImplement implements CombinePlayer {
                     );
                 };
 
-                this.stateMachine.one(CombinePlayerStatus.Disabled).then((): void => {
-                    this.taskQueue.destroy();
-                    this.onStatusUpdate(
-                        CombinePlayerStatus.Disabled,
-                        ACCIDENT_ENTERED_DISABLED_BY_VIDEO_IS_PAUSE_BUFFERING,
-                    );
-                    this.whiteboardEmitter.removeListener("playing", whiteboardOnPlaying);
-                    this.stateMachine.off([
-                        CombinePlayerStatus.ToPlay,
-                        CombinePlayerStatus.Playing,
-                    ]);
-                    this.video.off("play", videoOnPlay);
-                    this.video.off("playing", videoOnPlaying);
-                    resolve();
-                });
-
                 this.whiteboardEmitter.one("playing", whiteboardOnPlaying);
 
-                this.stateMachine.one(CombinePlayerStatus.ToPlay).then((): void => {
+                this.stateMachine.one(CombinePlayerStatus.ToPlay).then(({ done }): void => {
                     this.whiteboard.play();
+                    done();
                 });
 
-                this.stateMachine.one(CombinePlayerStatus.Playing).then((): void => {
+                this.stateMachine.one(CombinePlayerStatus.Playing).then(({ done }): void => {
                     this.onStatusUpdate(CombinePlayerStatus.Playing);
-                    this.stateMachine.off(CombinePlayerStatus.Disabled);
+                    done();
                     resolve();
                 });
 
@@ -582,59 +523,41 @@ export class CombinePlayerImplement implements CombinePlayer {
                     this.video.off("pause", videoOnPause);
                 };
 
-                this.stateMachine.on(
-                    CombinePlayerStatus.Disabled,
-                    (_previous, current, done): void => {
-                        // 当前路径下，是允许进入 Disable 区域的(video 为 playing，whiteboard 为 pauseBuffering)
-                        if (
-                            current.video === AtomPlayerStatus.Playing &&
-                            current.whiteboard === AtomPlayerStatus.PauseBuffering
-                        ) {
-                            this.video.pause();
-                        } else {
-                            this.taskQueue.destroy();
-                            this.onStatusUpdate(
-                                CombinePlayerStatus.Disabled,
-                                ACCIDENT_ENTERED_DISABLED_BY_WHITEBOARDER_IS_PAUSE_BUFFERING,
-                            );
-                            this.stateMachine.unlockCombineStatus();
-                            this.stateMachine.off([
-                                CombinePlayerStatus.PauseBuffering,
-                                CombinePlayerStatus.Pause,
-                                CombinePlayerStatus.ToPause,
-                                CombinePlayerStatus.Playing,
-                                CombinePlayerStatus.Disabled,
-                            ]);
-                            clearVideoAndWhiteboardEvents();
+                this.stateMachine
+                    .oneDisabled([
+                        {
+                            video: AtomPlayerStatus.Playing,
+                            whiteboard: AtomPlayerStatus.PauseBuffering,
+                        },
+                    ])
+                    .then(() => {
+                        this.video.pause();
+                    });
 
-                            resolve();
-                        }
-
-                        done();
-                    },
-                );
-
-                this.stateMachine.one(CombinePlayerStatus.PauseBuffering).then((): void => {
+                this.stateMachine.one(CombinePlayerStatus.PauseBuffering).then(({ done }): void => {
                     this.whiteboard.play();
+                    done();
                 });
 
-                this.stateMachine.one(CombinePlayerStatus.Pause).then((): void => {
+                this.stateMachine.one(CombinePlayerStatus.Pause).then(({ done }): void => {
                     this.whiteboard.play();
+                    done();
                 });
 
-                this.stateMachine.one(CombinePlayerStatus.ToPlay).then((): void => {
+                this.stateMachine.one(CombinePlayerStatus.ToPlay).then(({ done }): void => {
                     this.video.play();
+                    done();
                 });
 
-                this.stateMachine.one(CombinePlayerStatus.Playing).then((): void => {
+                this.stateMachine.one(CombinePlayerStatus.Playing).then(({ done }): void => {
                     this.onStatusUpdate(CombinePlayerStatus.Playing);
                     this.stateMachine.off([
                         CombinePlayerStatus.PauseBuffering,
                         CombinePlayerStatus.Pause,
                         CombinePlayerStatus.ToPause,
-                        CombinePlayerStatus.Disabled,
                     ]);
                     clearVideoAndWhiteboardEvents();
+                    done();
                     resolve();
                 });
 
@@ -694,84 +617,60 @@ export class CombinePlayerImplement implements CombinePlayer {
                     this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
                 };
 
-                this.stateMachine.on(
-                    CombinePlayerStatus.Disabled,
-                    (_previous, current, done): void => {
-                        const { video, whiteboard } = current;
-
-                        // 当前路径下，某些情况下是允许进入 Disable 区域的
-                        if (
-                            (video === AtomPlayerStatus.PlayingBuffering &&
-                                whiteboard === AtomPlayerStatus.PauseBuffering) ||
-                            (video === AtomPlayerStatus.PauseBuffering &&
-                                whiteboard === AtomPlayerStatus.PlayingBuffering)
-                        ) {
-                            //  nothing
-                        } else if (
-                            (video === AtomPlayerStatus.Playing &&
-                                whiteboard === AtomPlayerStatus.PauseBuffering) ||
-                            (video === AtomPlayerStatus.PauseBuffering &&
-                                whiteboard === AtomPlayerStatus.Playing)
-                        ) {
-                            // 这里是因为有可能存在，有一端已经开始播放了，但是另一端还在 pauseBuffering 状态。所以需要把播放的一端进行暂停
-                            if (video === AtomPlayerStatus.Playing) {
-                                this.video.pause();
-                            } else {
-                                this.whiteboard.pause();
-                            }
-                        } else {
-                            this.taskQueue.destroy();
-                            this.onStatusUpdate(
-                                CombinePlayerStatus.Disabled,
-                                ACCIDENT_ENTERED_DISABLED_BY_ALL_IS_PAUSE_BUFFERING,
-                            );
-                            this.stateMachine.unlockCombineStatus();
-                            this.stateMachine.off([
-                                CombinePlayerStatus.ToPause,
-                                CombinePlayerStatus.ToPlay,
-                                CombinePlayerStatus.Playing,
-                                CombinePlayerStatus.Disabled,
-                            ]);
-                            this.whiteboardEmitter.removeListener(
-                                "buffering",
-                                whiteboardOnBuffering,
-                            );
-                            this.whiteboardEmitter.removeListener("playing", whiteboardOnPlaying);
-                            this.whiteboardEmitter.removeListener("pause", whiteboardOnPause);
-                            this.video.off("playing", videoOnPlaying);
-                            this.video.off("play", videoOnPlay);
-                            this.video.off("pause", videoOnPause);
-
-                            done();
-                            resolve();
-                            return;
-                        }
-
-                        done();
+                this.stateMachine.oneDisabled([
+                    {
+                        video: AtomPlayerStatus.PlayingBuffering,
+                        whiteboard: AtomPlayerStatus.PauseBuffering,
                     },
-                );
+                    {
+                        video: AtomPlayerStatus.PauseBuffering,
+                        whiteboard: AtomPlayerStatus.PlayingBuffering,
+                    },
+                ]);
 
-                this.stateMachine.one(CombinePlayerStatus.ToPause).then(({ current }) => {
+                this.stateMachine
+                    .oneDisabled([
+                        {
+                            video: AtomPlayerStatus.Playing,
+                            whiteboard: AtomPlayerStatus.PauseBuffering,
+                        },
+                        {
+                            video: AtomPlayerStatus.PauseBuffering,
+                            whiteboard: AtomPlayerStatus.Playing,
+                        },
+                    ])
+                    .then(({ current }): void => {
+                        // 这里是因为有可能存在，有一端已经开始播放了，但是另一端还在 pauseBuffering 状态。所以需要把播放的一端进行暂停
+                        if (current.video === AtomPlayerStatus.Playing) {
+                            this.video.pause();
+                        } else {
+                            this.whiteboard.pause();
+                        }
+                    });
+
+                this.stateMachine.one(CombinePlayerStatus.ToPause).then(({ current, done }) => {
                     if (current.video === AtomPlayerStatus.Playing) {
                         this.video.pause();
                     } else {
                         this.whiteboard.pause();
                     }
+                    done();
                 });
 
-                this.stateMachine.one(CombinePlayerStatus.ToPlay).then(({ current }) => {
+                this.stateMachine.one(CombinePlayerStatus.ToPlay).then(({ current, done }) => {
                     if (current.video === AtomPlayerStatus.Playing) {
                         this.whiteboard.play();
                     } else {
                         this.video.play();
                     }
+                    done();
                 });
 
-                this.stateMachine.one(CombinePlayerStatus.Playing).then((): void => {
+                this.stateMachine.one(CombinePlayerStatus.Playing).then(({ done }): void => {
                     this.onStatusUpdate(CombinePlayerStatus.Playing);
                     this.video.off("playing", videoOnPlaying);
-                    this.stateMachine.off(CombinePlayerStatus.Disabled);
                     this.whiteboardEmitter.removeListener("playing", whiteboardOnPlaying);
+                    done();
                     resolve();
                 });
 
@@ -797,12 +696,12 @@ export class CombinePlayerImplement implements CombinePlayer {
      * 在 ended 状态下，用户调用播放时的处理
      * @private
      */
-    private playByEnded(): Promise<void> {
+    private playWhenEnded(): Promise<void> {
         return new Promise(resolve => {
             this.onStatusUpdate(CombinePlayerStatus.PlayingBuffering);
             this.stateMachine.lockCombineStatus(
-                [CombinePlayerStatus.Disabled, CombinePlayerStatus.Pause],
-                [CombinePlayerStatus.Pause, CombinePlayerStatus.Disabled],
+                [CombinePlayerStatus.Pause],
+                [CombinePlayerStatus.Pause],
             );
 
             const whiteboardOnPause = (): void => {
@@ -817,21 +716,10 @@ export class CombinePlayerImplement implements CombinePlayer {
                 this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
             };
 
-            this.stateMachine.one(CombinePlayerStatus.Disabled).then((): void => {
-                this.taskQueue.destroy();
-                this.onStatusUpdate(
-                    CombinePlayerStatus.Disabled,
-                    ACCIDENT_ENTERED_DISABLED_BY_ENDED,
-                );
-                this.whiteboardEmitter.removeListener("pause", whiteboardOnPause);
-                this.stateMachine.off(CombinePlayerStatus.Pause);
-                this.video.off("canplay", videoOnCanplay);
-                resolve();
-            });
-
             this.stateMachine.one(CombinePlayerStatus.Pause).then(
-                async (): Promise<void> => {
-                    await this.playByPause();
+                async ({ done }): Promise<void> => {
+                    await this.playWhenPause();
+                    done();
                     resolve();
                 },
             );
@@ -850,11 +738,11 @@ export class CombinePlayerImplement implements CombinePlayer {
      * 在 playing 状态下，用户调用暂停时的处理
      * @private
      */
-    private pauseByPlaying(): Promise<void> {
+    private pauseWhenPlaying(): Promise<void> {
         return new Promise(resolve => {
             this.stateMachine.lockCombineStatus(
-                [CombinePlayerStatus.Disabled, CombinePlayerStatus.Pause],
-                [CombinePlayerStatus.Pause, CombinePlayerStatus.Disabled],
+                [CombinePlayerStatus.Pause],
+                [CombinePlayerStatus.Pause],
             );
 
             const whiteboardOnPause = (): void => {
@@ -865,19 +753,9 @@ export class CombinePlayerImplement implements CombinePlayer {
                 this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
             };
 
-            this.stateMachine.one(CombinePlayerStatus.Disabled).then((): void => {
-                this.taskQueue.destroy();
-                this.onStatusUpdate(
-                    CombinePlayerStatus.Disabled,
-                    ACCIDENT_ENTERED_DISABLED_BY_PLAYING,
-                );
-                this.stateMachine.off(CombinePlayerStatus.Pause);
-                this.whiteboardEmitter.removeListener("pause", whiteboardOnPause);
-                this.video.off("pause", videoOnPause);
-            });
-
-            this.stateMachine.one(CombinePlayerStatus.Pause).then((): void => {
+            this.stateMachine.one(CombinePlayerStatus.Pause).then(({ done }): void => {
                 this.onStatusUpdate(CombinePlayerStatus.Pause);
+                done();
                 resolve();
             });
 
@@ -895,7 +773,7 @@ export class CombinePlayerImplement implements CombinePlayer {
      * @param {number} ms - 将要 seek 到的时间点
      * @private
      */
-    private seekByPlaying(ms: number): Promise<void> {
+    private seekWhenPlaying(ms: number): Promise<void> {
         return new Promise(resolve => {
             this.onStatusUpdate(CombinePlayerStatus.PlayingSeeking);
 
@@ -904,16 +782,11 @@ export class CombinePlayerImplement implements CombinePlayer {
 
             this.stateMachine.lockCombineStatus(
                 [
-                    CombinePlayerStatus.Disabled,
                     CombinePlayerStatus.Pause,
                     CombinePlayerStatus.Ended,
                     CombinePlayerStatus.PlayingSeeking,
                 ],
-                [
-                    CombinePlayerStatus.Pause,
-                    CombinePlayerStatus.Ended,
-                    CombinePlayerStatus.Disabled,
-                ],
+                [CombinePlayerStatus.Pause, CombinePlayerStatus.Ended],
             );
 
             const whiteboardOnBuffering = (): void => {
@@ -968,41 +841,25 @@ export class CombinePlayerImplement implements CombinePlayer {
                 this.video.off("ended", videoOnEnded);
             };
 
-            this.stateMachine.one(CombinePlayerStatus.Disabled).then((): void => {
-                this.taskQueue.destroy();
-                this.onStatusUpdate(
-                    CombinePlayerStatus.Disabled,
-                    ACCIDENT_ENTERED_DISABLED_BY_SEEKING_PLAYING,
-                );
-                this.stateMachine.off([
-                    CombinePlayerStatus.Pause,
-                    CombinePlayerStatus.Ended,
-                    CombinePlayerStatus.PlayingSeeking,
-                ]);
-                clearVideoAndWhiteboardEvents();
-                resolve();
-            });
-
             this.stateMachine.one(CombinePlayerStatus.Pause).then(
-                async (): Promise<void> => {
-                    this.stateMachine.off([
-                        CombinePlayerStatus.Ended,
-                        CombinePlayerStatus.Disabled,
-                    ]);
+                async ({ done }): Promise<void> => {
+                    this.stateMachine.off([CombinePlayerStatus.Ended]);
                     clearVideoAndWhiteboardEvents();
-                    await this.playByPause();
+                    await this.playWhenPause();
+                    done();
                     resolve();
                 },
             );
 
-            this.stateMachine.one(CombinePlayerStatus.Ended).then((): void => {
+            this.stateMachine.one(CombinePlayerStatus.Ended).then(({ done }): void => {
                 this.onStatusUpdate(CombinePlayerStatus.Ended);
-                this.stateMachine.off([CombinePlayerStatus.Pause, CombinePlayerStatus.Disabled]);
+                this.stateMachine.off([CombinePlayerStatus.Pause]);
                 clearVideoAndWhiteboardEvents();
+                done();
                 resolve();
             });
 
-            this.stateMachine.one(CombinePlayerStatus.PlayingSeeking).then(({ current }) => {
+            this.stateMachine.one(CombinePlayerStatus.PlayingSeeking).then(({ current, done }) => {
                 const { video, whiteboard } = current;
 
                 // 如果当前 seek 的时间没有超过 whiteboard，并且 当前 video 状态为 ended 时，才对 whiteboard 调用暂停。否则不需要
@@ -1011,6 +868,8 @@ export class CombinePlayerImplement implements CombinePlayer {
                 } else if (whiteboard === AtomPlayerStatus.Ended && ms < videoDuration) {
                     this.video.pause();
                 }
+
+                done();
             });
 
             this.video.one("seeking", videoOnSeeking);
@@ -1037,7 +896,7 @@ export class CombinePlayerImplement implements CombinePlayer {
      * @param {number} ms - 将要 seek 到的时间点
      * @private
      */
-    private seekByPause(ms: number): Promise<void> {
+    private seekWhenPause(ms: number): Promise<void> {
         return new Promise(resolve => {
             this.onStatusUpdate(CombinePlayerStatus.PauseSeeking);
 
@@ -1089,28 +948,14 @@ export class CombinePlayerImplement implements CombinePlayer {
                 this.whiteboardEmitter.removeListener("ended", whiteboardOnEnded);
             };
 
-            this.stateMachine.one(CombinePlayerStatus.Disabled).then(({ current }) => {
-                const { video: videoStatus, whiteboard: whiteboardStatus } = current;
+            this.stateMachine.oneDisabled([
+                {
+                    video: AtomPlayerStatus.PauseSeeking,
+                    whiteboard: AtomPlayerStatus.PauseSeeking,
+                },
+            ]);
 
-                if (
-                    videoStatus === AtomPlayerStatus.PauseSeeking ||
-                    whiteboardStatus === AtomPlayerStatus.PauseSeeking
-                ) {
-                    return;
-                }
-
-                this.taskQueue.destroy();
-                this.onStatusUpdate(
-                    CombinePlayerStatus.Disabled,
-                    ACCIDENT_ENTERED_DISABLED_BY_SEEKING_PAUSE,
-                );
-                this.stateMachine.unlockCombineStatus();
-                clearVideoAndWhiteboardEvents();
-                this.stateMachine.off([CombinePlayerStatus.Ended, CombinePlayerStatus.Pause]);
-                resolve();
-            });
-
-            this.stateMachine.one(CombinePlayerStatus.Pause).then((): void => {
+            this.stateMachine.one(CombinePlayerStatus.Pause).then(({ done }): void => {
                 // 当 ms 超过 video 视频的持续时间时，说明最终的状态是 Ended，而非 Pause，所以这里需要跳过
                 if (ms >= videoDuration) {
                     return;
@@ -1119,6 +964,7 @@ export class CombinePlayerImplement implements CombinePlayer {
                 this.onStatusUpdate(CombinePlayerStatus.Pause);
                 this.stateMachine.off(CombinePlayerStatus.Ended);
                 clearVideoAndWhiteboardEvents();
+                done();
                 resolve();
             });
 
@@ -1167,7 +1013,7 @@ export class CombinePlayerImplement implements CombinePlayer {
      * 当 video 处于 waiting 状态，插件自动暂停白板的处理
      * @private
      */
-    private pauseWhiteboardByVideoWaiting(): Promise<void> {
+    private pauseWhiteboardWhenVideoWaiting(): Promise<void> {
         return new Promise(resolve => {
             // 因为当 video 丢帧时，会触发多次的 waiting，而后面的 waiting 也会到达这里
             // 当 whiteboard 处于 pause 状态时，再次调用 pause 方法时，是不会触发 pause 事件的。所以需要提前进行判断。
@@ -1190,12 +1036,12 @@ export class CombinePlayerImplement implements CombinePlayer {
      * @param {boolean} isDropFrame - 是否丢帧
      * @private
      */
-    private playingWhiteboardByVideoPlaying(isDropFrame: boolean): Promise<void> {
+    private playingWhiteboardWhenVideoPlaying(isDropFrame: boolean): Promise<void> {
         return new Promise(resolve => {
             // video 丢帧时的处理
             // 我们会先把 video 进行暂停，然后对 whiteboard 进行 seek 校准
             // 而 whiteboard seek 校准时，会触发: buffering -> pause(因为在调用此函数之前，我们是能够保证 whiteboard 一定是暂停状态，所以 whiteboard seek 完成后，就一定会回到 pause 状态)
-            // 当 whiteboard 到达 pause 时(此时 video 也是处于 pause 状态)，我们就可以使用插件的 play 方法，来间接调用 playByPauseBuffering 方法，让其播放
+            // 当 whiteboard 到达 pause 时(此时 video 也是处于 pause 状态)，我们就可以使用插件的 play 方法，来间接调用 playWhenPauseBuffering 方法，让其播放
             if (isDropFrame) {
                 this.whiteboardEmitter.one("pause", (): void => {
                     // 因为当我们对 whiteboard 进行 seek 后，如果后面调用播放，会先进入 buffering 阶段。所以这里设置 whiteboard 状态 为 pause-buffering 状态
@@ -1203,7 +1049,7 @@ export class CombinePlayerImplement implements CombinePlayer {
                         AtomPlayerSource.Whiteboard,
                         AtomPlayerStatus.PauseBuffering,
                     );
-                    this.playByPauseBuffering().then(resolve);
+                    this.playWhenPauseBuffering().then(resolve);
                 });
 
                 this.video.one("pause", (): void => {
@@ -1216,8 +1062,9 @@ export class CombinePlayerImplement implements CombinePlayer {
                 // video 在播放状态时，由于网络问题，导致 video 需要缓冲。现缓存完毕，开始让 whiteboard 播放
                 this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Playing);
 
-                this.stateMachine.one(CombinePlayerStatus.Playing).then((): void => {
+                this.stateMachine.one(CombinePlayerStatus.Playing).then(({ done }): void => {
                     this.onStatusUpdate(CombinePlayerStatus.Playing);
+                    done();
                     resolve();
                 });
 
@@ -1237,7 +1084,7 @@ export class CombinePlayerImplement implements CombinePlayer {
      * 当 whiteboard 为 buffering 时，插件自动调用 video 的 暂停方法
      * @private
      */
-    private pauseVideoByWhiteboardBuffering(): Promise<void> {
+    private pauseVideoWhenWhiteboardBuffering(): Promise<void> {
         return new Promise(resolve => {
             // 当 video 处于 pause 状态时，再次调用 pause 方法时，是不会触发 pause 事件的。所以需要提前进行判断。
             if (this.video.paused()) {
@@ -1258,14 +1105,16 @@ export class CombinePlayerImplement implements CombinePlayer {
      * 当 whiteboard 为 playing 时，插件自动调用 video 的播放方法
      * @private
      */
-    private playingVideoByWhiteboardPlaying(): Promise<void> {
+    private playingVideoWhenWhiteboardPlaying(): Promise<void> {
         return new Promise(resolve => {
-            this.stateMachine.one(CombinePlayerStatus.ToPlay).then((): void => {
+            this.stateMachine.one(CombinePlayerStatus.ToPlay).then(({ done }): void => {
                 this.video.play();
+                done();
             });
 
-            this.stateMachine.one(CombinePlayerStatus.Playing).then((): void => {
+            this.stateMachine.one(CombinePlayerStatus.Playing).then(({ done }): void => {
                 this.onStatusUpdate(CombinePlayerStatus.Playing);
+                done();
                 resolve();
             });
 
@@ -1281,10 +1130,11 @@ export class CombinePlayerImplement implements CombinePlayer {
      * 当 whiteboard 处于 ended 状态时，插件自动调用 video 的暂停方法
      * @private
      */
-    private pauseVideoByWhiteboardEnded(): Promise<void> {
+    private pauseVideoWhenWhiteboardEnded(): Promise<void> {
         return new Promise(resolve => {
-            this.stateMachine.one(CombinePlayerStatus.Ended).then((): void => {
+            this.stateMachine.one(CombinePlayerStatus.Ended).then(({ done }): void => {
                 this.onStatusUpdate(CombinePlayerStatus.Ended);
+                done();
                 resolve();
             });
 
@@ -1300,10 +1150,11 @@ export class CombinePlayerImplement implements CombinePlayer {
      * 当 video 处于 ended 状态时，插件自动调用 whiteboard 的 暂停方法
      * @private
      */
-    private pauseWhiteboardByVideoEnded(): Promise<void> {
+    private pauseWhiteboardWhenVideoEnded(): Promise<void> {
         return new Promise(resolve => {
-            this.stateMachine.one(CombinePlayerStatus.Ended).then((): void => {
+            this.stateMachine.one(CombinePlayerStatus.Ended).then(({ done }): void => {
                 this.onStatusUpdate(CombinePlayerStatus.Ended);
+                done();
                 resolve();
             });
 
@@ -1322,6 +1173,56 @@ export class CombinePlayerImplement implements CombinePlayer {
      */
     private setTriggerSource(source: TriggerSource): void {
         this.triggerSource = source;
+    }
+
+    /**
+     * 意外进入 Disabled 状态处理
+     * @private
+     */
+    private initDisabledStatusHandler(): void {
+        this.stateMachine.on(CombinePlayerStatus.Disabled, (_previous, current, done) => {
+            const { video: videoStatus, whiteboard: whiteboardStatus } = current;
+
+            let reportErrorFlag = true;
+            this.stateMachine.allowStatusListWhenDisabled.forEach(value => {
+                value.forEach(({ whiteboard, video }) => {
+                    if (whiteboard === whiteboardStatus && video === videoStatus) {
+                        reportErrorFlag = false;
+                    }
+                });
+            });
+
+            if (reportErrorFlag) {
+                this.taskQueue.destroy();
+                this.stateMachine.destroy();
+                this.whiteboardEmitter.destroy();
+                this.setTriggerSource(TriggerSource.None);
+                this.video.off();
+                this.onStatusUpdate(CombinePlayerStatus.Disabled, ACCIDENT_ENTERED_DISABLED);
+            }
+
+            done();
+        });
+    }
+
+    /**
+     * 状态通知更新
+     * @param {PublicCombinedStatus} status - 要通知的状态
+     * @param {string} [message] - 额外信息
+     * @private
+     */
+    private onStatusUpdate(status: PublicCombinedStatus, message?: string): void {
+        if (this.currentCombineStatus !== status) {
+            this.currentCombineStatus = status;
+
+            // 使用 Promise 封装一层，转为异步，以保证用户传入的参数不会影响到插件本身。
+            // 因为如果用户的回调里存在着阻塞代码，也会影响到插件本身
+            Promise.resolve().then((): void => {
+                this.onStatusChangeHandleList.forEach(cb => {
+                    cb(status, message);
+                });
+            });
+        }
     }
 }
 

@@ -1,12 +1,12 @@
 import { debugLog } from "./Log";
-import { CombinePlayerStatus, AtomPlayerSource, AtomPlayerStatus } from "./StatusContant";
+import { AtomPlayerSource, AtomPlayerStatus, CombinePlayerStatus } from "./StatusContant";
 import {
+    AtomPlayerStatusCompose,
+    AtomPlayerStatusPair,
+    AtomPlayerStatusTransfer,
     CombinePlayerStatusTransfer,
     LockInfo,
-    AtomPlayerStatusPair,
     OnEventCallback,
-    AtomPlayerStatusTransfer,
-    AtomPlayerStatusCompose,
 } from "./Types";
 import { EventEmitter } from "./EventEmitter";
 
@@ -33,6 +33,8 @@ export class StateMachine {
 
     private readonly debug: (...args: any[]) => void = () => {};
 
+    public allowStatusListWhenDisabled: Map<OnEventCallback, AtomPlayerStatusPair[]> = new Map();
+
     /**
      * 实例化 状态机
      * @param {boolean} debug - 是否开启 debug 日志
@@ -52,12 +54,46 @@ export class StateMachine {
     public one(eventName: CombinePlayerStatus): Promise<AtomPlayerStatusCompose> {
         return new Promise(resolve => {
             this.events.one(eventName, (previous, current, done) => {
-                done();
                 resolve({
                     previous,
                     current,
+                    done,
                 });
             });
+        });
+    }
+
+    /**
+     * 监听合法的 Disabled 状态
+     * @param {AtomPlayerStatusPair[]} atomPlayerStatusPair - 只有当满足此情况，才运行逻辑
+     */
+    public oneDisabled(
+        atomPlayerStatusPair: AtomPlayerStatusPair[],
+    ): Promise<AtomPlayerStatusCompose> {
+        return new Promise(resolve => {
+            const callback: OnEventCallback = (previous, current, done): void => {
+                const whiteboardStatus = this.getStatus(AtomPlayerSource.Whiteboard).current;
+                const videoStatus = this.getStatus(AtomPlayerSource.Video).current;
+
+                const flag =
+                    atomPlayerStatusPair.filter(({ video, whiteboard }) => {
+                        return whiteboard === whiteboardStatus && video === videoStatus;
+                    }).length !== 0;
+
+                if (flag) {
+                    resolve({
+                        previous,
+                        current,
+                        done: () => {
+                            done();
+                            this.allowStatusListWhenDisabled.delete(callback);
+                        },
+                    });
+                }
+            };
+
+            this.allowStatusListWhenDisabled.set(callback, atomPlayerStatusPair);
+            this.events.one(CombinePlayerStatus.Disabled, callback);
         });
     }
 
@@ -82,6 +118,14 @@ export class StateMachine {
                 this.events.removeAllListener(eventName[i]);
             }
         }
+    }
+
+    /**
+     * 销毁整个 event 事件
+     */
+    public destroy(): void {
+        this.events.destroy();
+        this.unlockCombineStatus();
     }
 
     /**

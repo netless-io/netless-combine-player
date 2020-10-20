@@ -51,6 +51,12 @@ export class EventEmitter {
         delete this.listeners[eventName];
     }
 
+    public destroy(): void {
+        Object.keys(this.listeners).forEach(eventName => {
+            this.removeAllListener(eventName);
+        });
+    }
+
     public one(eventName: string, cb: AnyFunction): void {
         if (isNotFn(cb)) {
             return;

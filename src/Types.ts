@@ -18,6 +18,7 @@ export type AtomPlayerStatusPair = {
 export type AtomPlayerStatusCompose = {
     previous: AtomPlayerStatusPair;
     current: AtomPlayerStatusPair;
+    done: AnyFunction;
 };
 
 export type OnEventCallback = (
