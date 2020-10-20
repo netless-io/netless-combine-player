@@ -944,12 +944,9 @@ export class CombinePlayerImplement implements CombinePlayer {
 
             const videoOnSeeked = (): void => {
                 if (ms < videoDuration) {
+                    this.video.pause();
                     this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
                 }
-            };
-
-            const videoOnPlaying = (): void => {
-                this.video.pause();
             };
 
             const videoOnEnded = (): void => {
@@ -963,7 +960,6 @@ export class CombinePlayerImplement implements CombinePlayer {
                 this.whiteboardEmitter.removeListener("ended", whiteboardOnEnded);
                 this.video.off("seeking", videoOnSeeking);
                 this.video.off("seeked", videoOnSeeked);
-                this.video.off("playing", videoOnPlaying);
                 this.video.off("ended", videoOnEnded);
             };
 
@@ -1015,8 +1011,6 @@ export class CombinePlayerImplement implements CombinePlayer {
             this.video.one("seeking", videoOnSeeking);
 
             this.video.one("seeked", videoOnSeeked);
-
-            this.video.one("playing", videoOnPlaying);
 
             this.video.one("ended", videoOnEnded);
 
