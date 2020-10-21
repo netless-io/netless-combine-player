@@ -102,5 +102,6 @@ module.exports = {
         "@typescript-eslint/no-floating-promises": "off",
         "@typescript-eslint/no-non-null-assertion": "off",
         "@typescript-eslint/no-inferrable-types": "off",
+        "@typescript-eslint/require-await": "off",
     },
 };

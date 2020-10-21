@@ -27,6 +27,14 @@ export type OnEventCallback = (
     done: () => void,
 ) => any;
 
+export type OneEventCallback = ({
+    previous,
+    current,
+}: {
+    previous: AtomPlayerStatusPair;
+    current: AtomPlayerStatusPair;
+}) => any;
+
 export type AnyFunction = (...args: any[]) => any;
 
 export type PublicCombinedStatus =
