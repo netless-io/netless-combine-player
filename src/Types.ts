@@ -21,20 +21,6 @@ export type AtomPlayerStatusCompose = {
     done: AnyFunction;
 };
 
-export type OnEventCallback = (
-    previous: AtomPlayerStatusPair,
-    current: AtomPlayerStatusPair,
-    done: () => void,
-) => any;
-
-export type OneEventCallback = ({
-    previous,
-    current,
-}: {
-    previous: AtomPlayerStatusPair;
-    current: AtomPlayerStatusPair;
-}) => any;
-
 export type AnyFunction = (...args: any[]) => any;
 
 export type PublicCombinedStatus =

@@ -7,10 +7,12 @@ import {
     AtomPlayerStatusTransfer,
     CombinePlayerStatusTransfer,
     LockInfo,
-    OneEventCallback,
-    OnEventCallback,
 } from "./Types";
 import { EventEmitter } from "./EventEmitter";
+import {
+    ACCIDENT_ENTERED_DISABLED,
+    MONITOR_LEGAL_DISABLE_STATE_MULTIPLE_TIMES,
+} from "./ErrorConstant";
 
 export class StateMachine {
     private readonly videoStatus: AtomPlayerStatusTransfer = {
@@ -35,7 +37,7 @@ export class StateMachine {
 
     private readonly debug: (...args: any[]) => void = () => {};
 
-    private allowStatusListWhenDisabled: AtomPlayerStatusPair[] = [];
+    private statusIgnoreCrashByDisabled: AtomPlayerStatusPair[] = [];
 
     /**
      * 实例化 状态机
@@ -51,78 +53,104 @@ export class StateMachine {
 
     public one(
         eventName: CombinePlayerStatus,
-        cb: OneEventCallback,
+        cb: OnStatusUpdate,
     ): Promise<AtomPlayerStatusCompose> {
-        return new Promise(resolve => {
-            this.events.one(eventName, (previous, current, done) => {
-                cb({
-                    previous,
-                    current,
-                }).then(() => {
-                    done();
+        return new Promise((resolve, reject) => {
+            this.events.one(eventName, async (previous, current, done) => {
+                try {
+                    await cb({
+                        previous,
+                        current,
+                    });
                     resolve();
-                });
+                } catch (err) {
+                    reject(err);
+                } finally {
+                    done();
+                }
             });
         });
     }
 
-    public disabledHandler(crashHandler: AnyFunction): void {
-        this.on(CombinePlayerStatus.Disabled, (_previous, current, done) => {
+    public setOnCrashByDisabledStatus(crashHandler: AnyFunction): void {
+        this.on(CombinePlayerStatus.Disabled, async ({ current }) => {
             const { video: videoStatus, whiteboard: whiteboardStatus } = current;
 
-            let reportErrorFlag = true;
-            this.allowStatusListWhenDisabled.forEach(({ video, whiteboard }) => {
-                if (whiteboard === whiteboardStatus && video === videoStatus) {
-                    reportErrorFlag = false;
-                }
-            });
+            const flag = this.shouldCrash(videoStatus, whiteboardStatus);
 
-            if (reportErrorFlag) {
+            if (flag) {
                 crashHandler();
             }
-
-            done();
         });
     }
 
     /**
-     * 监听合法的 Disabled 状态
-     * @param {AtomPlayerStatusPair[]} allowStatusList - 只有当满足此情况，才运行逻辑
+     * 在设计时，我们认为凡是进入到 Disable 状态的，都是意外情况，是不应该出现的。但实际上总会有几种情况，进入 Disable 是合法且正常的
+     * 所以需要通过此函数来监听合法的 Disabled 状态
+     *
+     * @param {AtomPlayerStatusPair[]} statusIgnoreCrashByDisabled - 只有当满足此情况，才运行逻辑
+     * 并不是所有的情况进入 Disable 状态 都是正常的，需要一个过滤器，只有当前的状态满足了这个过滤器，才会属于合法情况
+     * @param {OnStatusUpdate} [cb] - 状态回调
      */
-    public oneDisabled(allowStatusList: AtomPlayerStatusPair[]): Promise<AtomPlayerStatusCompose> {
-        return new Promise(resolve => {
-            this.allowStatusListWhenDisabled = allowStatusList;
+    public oneButNotCrashByDisabled(
+        statusIgnoreCrashByDisabled: AtomPlayerStatusPair[],
+        cb?: OnStatusUpdate,
+    ): Promise<AtomPlayerStatusCompose> {
+        return new Promise((resolve, reject) => {
+            if (this.statusIgnoreCrashByDisabled.length !== 0) {
+                return reject(new Error(MONITOR_LEGAL_DISABLE_STATE_MULTIPLE_TIMES));
+            }
 
-            this.events.one(CombinePlayerStatus.Disabled, (previous, current, done): void => {
-                const whiteboardStatus = this.getStatus(AtomPlayerSource.Whiteboard).current;
-                const videoStatus = this.getStatus(AtomPlayerSource.Video).current;
+            this.statusIgnoreCrashByDisabled = statusIgnoreCrashByDisabled;
 
-                const flag =
-                    allowStatusList.filter(({ video, whiteboard }) => {
-                        return whiteboard === whiteboardStatus && video === videoStatus;
-                    }).length !== 0;
+            this.events.one(
+                CombinePlayerStatus.Disabled,
+                async (previous, current, done): Promise<void> => {
+                    const whiteboardStatus = this.getStatus(AtomPlayerSource.Whiteboard).current;
+                    const videoStatus = this.getStatus(AtomPlayerSource.Video).current;
 
-                if (flag) {
-                    resolve({
-                        previous,
-                        current,
-                        done: () => {
-                            done();
-                            this.allowStatusListWhenDisabled = [];
-                        },
-                    });
-                }
-            });
+                    const flag = !this.shouldCrash(videoStatus, whiteboardStatus);
+
+                    if (flag) {
+                        if (cb) {
+                            await cb({
+                                previous,
+                                current,
+                            });
+                        }
+
+                        this.statusIgnoreCrashByDisabled = [];
+                        done();
+                        resolve();
+                    } else {
+                        reject(new Error(ACCIDENT_ENTERED_DISABLED));
+                    }
+                },
+            );
         });
     }
 
     /**
      * 监听组合状态变更回调
      * @param {CombinePlayerStatus} eventName - 需要监听的组合状态名
-     * @param {OnEventCallback} cb - 事件回调
+     * @param {OnStatusUpdate} cb - 事件回调
      */
-    public on(eventName: CombinePlayerStatus, cb: OnEventCallback): void {
-        this.events.addListener(eventName, cb);
+    public on(eventName: CombinePlayerStatus, cb: OnStatusUpdate): Promise<void> {
+        return new Promise((resolve, reject) => {
+            this.events.addListener(eventName, async (previous, current, done) => {
+                try {
+                    await cb({
+                        previous,
+                        current,
+                    });
+                    resolve();
+                } catch (err) {
+                    reject(err);
+                } finally {
+                    done();
+                }
+            });
+        });
     }
 
     /**
@@ -179,21 +207,23 @@ export class StateMachine {
         const whiteboardStatusIndex = this.whiteboardStatus.current;
         const videoStatusIndex = this.videoStatus.current;
 
-        const combineStatus = this.table[whiteboardStatusIndex][videoStatusIndex];
+        const tableData = this.table[whiteboardStatusIndex][videoStatusIndex];
 
         // 如果当前设置了 lock，则只有在 允许状态列表里，才会运行相关的组合状态回调
         // 当不在 解锁状态列表里，是不会运行任何的组合状态回调
         if (this.statusLockInfo.isLocked) {
-            if (this.statusLockInfo.allowStatusList.includes(combineStatus.combineStatus)) {
+            if (this.statusLockInfo.allowStatusList.includes(tableData.combineStatus)) {
                 // 当符合条件时解锁
-                if (this.statusLockInfo.unLockStatusList.includes(combineStatus.combineStatus)) {
+                if (this.statusLockInfo.unLockStatusList.includes(tableData.combineStatus)) {
                     this.unlockCombineStatus();
+                    // 当 当前上下文结束时，置空。防止干扰后续的上下文
+                    this.statusIgnoreCrashByDisabled = [];
                 }
 
-                this.handleEvent(combineStatus);
+                this.dispatchEvent(tableData);
             }
         } else {
-            this.handleEvent(combineStatus);
+            this.dispatchEvent(tableData);
         }
     }
 
@@ -213,15 +243,6 @@ export class StateMachine {
         this.statusLockInfo.isLocked = true;
         this.statusLockInfo.allowStatusList = allowStatusList;
         this.statusLockInfo.unLockStatusList = unLockStatusList;
-    }
-
-    /**
-     * 关闭 状态锁
-     */
-    public unlockCombineStatus(): void {
-        this.statusLockInfo.isLocked = false;
-        this.statusLockInfo.allowStatusList = [];
-        this.statusLockInfo.unLockStatusList = [];
     }
 
     /**
@@ -261,6 +282,31 @@ export class StateMachine {
         }
     }
 
+    private shouldCrash(
+        videoStatus: AtomPlayerStatus,
+        whiteboardStatus: AtomPlayerStatus,
+    ): boolean {
+        let foundAnyStatusMatches = false;
+
+        for (const { video, whiteboard } of this.statusIgnoreCrashByDisabled) {
+            if (whiteboardStatus === whiteboard && video === videoStatus) {
+                foundAnyStatusMatches = true;
+                break;
+            }
+        }
+
+        return !foundAnyStatusMatches;
+    }
+
+    /**
+     * 关闭 状态锁
+     */
+    private unlockCombineStatus(): void {
+        this.statusLockInfo.isLocked = false;
+        this.statusLockInfo.allowStatusList = [];
+        this.statusLockInfo.unLockStatusList = [];
+    }
+
     /**
      * 设置上一次的状态下标
      * @param {AtomPlayerStatus} whiteboard - 回放的状态下标
@@ -277,7 +323,7 @@ export class StateMachine {
      * @param tableData
      * @private
      */
-    private handleEvent(tableData: TableData): void {
+    private dispatchEvent(tableData: TableData): void {
         const { videoStatus, whiteboardStatus, combineStatus } = tableData;
 
         const previous: AtomPlayerStatusPair = {
@@ -410,12 +456,20 @@ export class StateMachine {
     }
 }
 
-export type Table = readonly (readonly TableData[])[];
+type Table = readonly (readonly TableData[])[];
 
-export type TableData = {
+type TableData = {
     readonly combineStatus: CombinePlayerStatus;
     readonly whiteboardStatus: AtomPlayerStatus;
     readonly videoStatus: AtomPlayerStatus;
 };
 
-export type GenerateTable = (whiteboard: AtomPlayerStatus, video: AtomPlayerStatus) => TableData;
+type GenerateTable = (whiteboard: AtomPlayerStatus, video: AtomPlayerStatus) => TableData;
+
+type OnStatusUpdate = ({
+    previous,
+    current,
+}: {
+    previous: AtomPlayerStatusPair;
+    current: AtomPlayerStatusPair;
+}) => Promise<void>;
