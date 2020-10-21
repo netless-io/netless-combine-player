@@ -617,19 +617,16 @@ export class CombinePlayerImplement implements CombinePlayer {
                     this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
                 };
 
-                this.stateMachine.oneDisabled([
-                    {
-                        video: AtomPlayerStatus.PlayingBuffering,
-                        whiteboard: AtomPlayerStatus.PauseBuffering,
-                    },
-                    {
-                        video: AtomPlayerStatus.PauseBuffering,
-                        whiteboard: AtomPlayerStatus.PlayingBuffering,
-                    },
-                ]);
-
                 this.stateMachine
                     .oneDisabled([
+                        {
+                            video: AtomPlayerStatus.PlayingBuffering,
+                            whiteboard: AtomPlayerStatus.PauseBuffering,
+                        },
+                        {
+                            video: AtomPlayerStatus.PauseBuffering,
+                            whiteboard: AtomPlayerStatus.PlayingBuffering,
+                        },
                         {
                             video: AtomPlayerStatus.Playing,
                             whiteboard: AtomPlayerStatus.PauseBuffering,
@@ -643,7 +640,7 @@ export class CombinePlayerImplement implements CombinePlayer {
                         // 这里是因为有可能存在，有一端已经开始播放了，但是另一端还在 pauseBuffering 状态。所以需要把播放的一端进行暂停
                         if (current.video === AtomPlayerStatus.Playing) {
                             this.video.pause();
-                        } else {
+                        } else if (current.whiteboard === AtomPlayerStatus.Playing) {
                             this.whiteboard.pause();
                         }
                     });
@@ -1180,28 +1177,13 @@ export class CombinePlayerImplement implements CombinePlayer {
      * @private
      */
     private initDisabledStatusHandler(): void {
-        this.stateMachine.on(CombinePlayerStatus.Disabled, (_previous, current, done) => {
-            const { video: videoStatus, whiteboard: whiteboardStatus } = current;
-
-            let reportErrorFlag = true;
-            this.stateMachine.allowStatusListWhenDisabled.forEach(value => {
-                value.forEach(({ whiteboard, video }) => {
-                    if (whiteboard === whiteboardStatus && video === videoStatus) {
-                        reportErrorFlag = false;
-                    }
-                });
-            });
-
-            if (reportErrorFlag) {
-                this.taskQueue.destroy();
-                this.stateMachine.destroy();
-                this.whiteboardEmitter.destroy();
-                this.setTriggerSource(TriggerSource.None);
-                this.video.off();
-                this.onStatusUpdate(CombinePlayerStatus.Disabled, ACCIDENT_ENTERED_DISABLED);
-            }
-
-            done();
+        this.stateMachine.disabledHandler(() => {
+            this.taskQueue.destroy();
+            this.stateMachine.destroy();
+            this.whiteboardEmitter.destroy();
+            this.setTriggerSource(TriggerSource.None);
+            this.video.off();
+            this.onStatusUpdate(CombinePlayerStatus.Disabled, ACCIDENT_ENTERED_DISABLED);
         });
     }
 

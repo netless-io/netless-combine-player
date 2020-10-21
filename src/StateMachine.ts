@@ -1,6 +1,7 @@
 import { debugLog } from "./Log";
 import { AtomPlayerSource, AtomPlayerStatus, CombinePlayerStatus } from "./StatusContant";
 import {
+    AnyFunction,
     AtomPlayerStatusCompose,
     AtomPlayerStatusPair,
     AtomPlayerStatusTransfer,
@@ -33,7 +34,7 @@ export class StateMachine {
 
     private readonly debug: (...args: any[]) => void = () => {};
 
-    public allowStatusListWhenDisabled: Map<OnEventCallback, AtomPlayerStatusPair[]> = new Map();
+    private allowStatusListWhenDisabled: AtomPlayerStatusPair[] = [];
 
     /**
      * 实例化 状态机
@@ -63,20 +64,39 @@ export class StateMachine {
         });
     }
 
+    public disabledHandler(crashHandler: AnyFunction): void {
+        this.on(CombinePlayerStatus.Disabled, (_previous, current, done) => {
+            const { video: videoStatus, whiteboard: whiteboardStatus } = current;
+
+            let reportErrorFlag = true;
+            this.allowStatusListWhenDisabled.forEach(({ video, whiteboard }) => {
+                if (whiteboard === whiteboardStatus && video === videoStatus) {
+                    reportErrorFlag = false;
+                }
+            });
+
+            if (reportErrorFlag) {
+                crashHandler();
+            }
+
+            done();
+        });
+    }
+
     /**
      * 监听合法的 Disabled 状态
-     * @param {AtomPlayerStatusPair[]} atomPlayerStatusPair - 只有当满足此情况，才运行逻辑
+     * @param {AtomPlayerStatusPair[]} allowStatusList - 只有当满足此情况，才运行逻辑
      */
-    public oneDisabled(
-        atomPlayerStatusPair: AtomPlayerStatusPair[],
-    ): Promise<AtomPlayerStatusCompose> {
+    public oneDisabled(allowStatusList: AtomPlayerStatusPair[]): Promise<AtomPlayerStatusCompose> {
         return new Promise(resolve => {
-            const callback: OnEventCallback = (previous, current, done): void => {
+            this.allowStatusListWhenDisabled = allowStatusList;
+
+            this.events.one(CombinePlayerStatus.Disabled, (previous, current, done): void => {
                 const whiteboardStatus = this.getStatus(AtomPlayerSource.Whiteboard).current;
                 const videoStatus = this.getStatus(AtomPlayerSource.Video).current;
 
                 const flag =
-                    atomPlayerStatusPair.filter(({ video, whiteboard }) => {
+                    allowStatusList.filter(({ video, whiteboard }) => {
                         return whiteboard === whiteboardStatus && video === videoStatus;
                     }).length !== 0;
 
@@ -86,14 +106,11 @@ export class StateMachine {
                         current,
                         done: () => {
                             done();
-                            this.allowStatusListWhenDisabled.delete(callback);
+                            this.allowStatusListWhenDisabled = [];
                         },
                     });
                 }
-            };
-
-            this.allowStatusListWhenDisabled.set(callback, atomPlayerStatusPair);
-            this.events.one(CombinePlayerStatus.Disabled, callback);
+            });
         });
     }
 
