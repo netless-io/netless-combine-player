@@ -1,11 +1,7 @@
 import { AnyFunction } from "./Types";
 
-const toType = (val: any): string => {
-    return {}.toString.call(val);
-};
-
 const isNotFn = (fn: AnyFunction): boolean => {
-    return !["[object Function]", "[object AsyncFunction]"].includes(toType(fn));
+    return typeof fn !== "function";
 };
 
 export class EventEmitter {
@@ -17,34 +13,38 @@ export class EventEmitter {
 
     public addListener(eventName: string, cb: AnyFunction): void {
         if (isNotFn(cb)) {
-            return;
+            throw Error("callback is not a function");
         }
 
-        const currentListener = this.getEvent(eventName);
+        const currentListeners = this.getEvent(eventName);
 
-        if (currentListener) {
-            currentListener.push(cb);
+        if (currentListeners) {
+            currentListeners.push(cb);
         } else {
             this.listeners[eventName] = [cb];
         }
     }
 
     public removeListener(eventName: string, cb: AnyFunction): void {
-        const currentListener = this.getEvent(eventName);
-        if (!currentListener) {
+        const currentListeners = this.getEvent(eventName);
+        if (!currentListeners) {
             return;
         }
 
-        this.listeners[eventName] = currentListener.filter(listener => {
+        for (let i = 0; i < currentListeners.length; i++) {
+            const listener = currentListeners[i];
             // realCallbackFn 的作用是，once 还没有运行时如果取消了，则要做出相应的处理
             // @ts-ignore
-            return listener !== cb && cb !== listener.realCallbackFn;
-        });
+            if (listener === cb || listener.realCallbackFn === cb) {
+                this.listeners[eventName].splice(i, 1);
+                i--;
+            }
+        }
     }
 
     public removeAllListener(eventName: string): void {
-        const currentListener = this.getEvent(eventName);
-        if (!currentListener) {
+        const currentListeners = this.getEvent(eventName);
+        if (!currentListeners) {
             return;
         }
 
@@ -59,11 +59,17 @@ export class EventEmitter {
 
     public one(eventName: string, cb: AnyFunction): void {
         if (isNotFn(cb)) {
-            return;
+            throw Error("callback is not a function");
         }
 
         const wrap = (...arg: any[]): void => {
-            cb(...arg);
+            if ({}.toString.call(cb) === "[object AsyncFunction]") {
+                cb(...arg).catch((e: any) => {
+                    throw Error(e);
+                });
+            } else {
+                cb(...arg);
+            }
             this.removeListener(eventName, wrap);
         };
 
@@ -73,12 +79,12 @@ export class EventEmitter {
     }
 
     public emit(eventName: string, ...arg: any[]): void {
-        const currentListener = this.getEvent(eventName);
-        if (!currentListener) {
+        const currentListeners = this.getEvent(eventName);
+        if (!currentListeners) {
             return;
         }
 
-        currentListener.forEach(listener => listener(...arg));
+        currentListeners.forEach(listener => listener(...arg));
     }
 
     private getEvent(eventName: string): AnyFunction[] | null {

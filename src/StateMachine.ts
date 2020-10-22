@@ -38,6 +38,7 @@ export class StateMachine {
     private readonly debug: (...args: any[]) => void = () => {};
 
     private statusIgnoreCrashByDisabled: AtomPlayerStatusPair[] = [];
+    private statusIgnoreCrashByDisabledCallback: Callback = () => Promise.resolve();
 
     /**
      * 实例化 状态机
@@ -53,15 +54,17 @@ export class StateMachine {
 
     public one(
         eventName: CombinePlayerStatus,
-        cb: OnStatusUpdate,
+        cb?: OnStatusUpdate,
     ): Promise<AtomPlayerStatusCompose> {
         return new Promise((resolve, reject) => {
             this.events.one(eventName, async (previous, current, done) => {
                 try {
-                    await cb({
-                        previous,
-                        current,
-                    });
+                    if (cb) {
+                        await cb({
+                            previous,
+                            current,
+                        });
+                    }
                     resolve();
                 } catch (err) {
                     reject(err);
@@ -72,13 +75,18 @@ export class StateMachine {
         });
     }
 
-    public setOnCrashByDisabledStatus(crashHandler: AnyFunction): void {
-        this.on(CombinePlayerStatus.Disabled, async ({ current }) => {
+    public async setOnCrashByDisabledStatus(crashHandler: AnyFunction): Promise<void> {
+        return this.on(CombinePlayerStatus.Disabled, async ({ current }) => {
             const { video: videoStatus, whiteboard: whiteboardStatus } = current;
+
+            // 当当前页面不在浏览器的Tab激活页时，而后又被激活，就会出现在这种情况。所以这里对其做了额外处理，认为是合法状态
+            const whiteboardBuffering =
+                whiteboardStatus === AtomPlayerStatus.PauseBuffering &&
+                videoStatus === AtomPlayerStatus.Playing;
 
             const flag = this.shouldCrash(videoStatus, whiteboardStatus);
 
-            if (flag) {
+            if (flag && !whiteboardBuffering) {
                 crashHandler();
             }
         });
@@ -103,31 +111,48 @@ export class StateMachine {
 
             this.statusIgnoreCrashByDisabled = statusIgnoreCrashByDisabled;
 
-            this.events.one(
-                CombinePlayerStatus.Disabled,
-                async (previous, current, done): Promise<void> => {
-                    const whiteboardStatus = this.getStatus(AtomPlayerSource.Whiteboard).current;
-                    const videoStatus = this.getStatus(AtomPlayerSource.Video).current;
+            const callback: Callback = async (previous, current, done): Promise<void> => {
+                const whiteboardStatus = this.getStatus(AtomPlayerSource.Whiteboard).current;
+                const videoStatus = this.getStatus(AtomPlayerSource.Video).current;
 
-                    const flag = !this.shouldCrash(videoStatus, whiteboardStatus);
+                const flag = !this.shouldCrash(videoStatus, whiteboardStatus);
 
-                    if (flag) {
-                        if (cb) {
-                            await cb({
-                                previous,
-                                current,
-                            });
-                        }
-
-                        this.statusIgnoreCrashByDisabled = [];
-                        done();
-                        resolve();
-                    } else {
-                        reject(new Error(ACCIDENT_ENTERED_DISABLED));
+                if (flag) {
+                    if (cb) {
+                        await cb({
+                            previous,
+                            current,
+                        });
                     }
-                },
-            );
+
+                    this.statusIgnoreCrashByDisabled = [];
+                    // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+                    this.statusIgnoreCrashByDisabledCallback = () => Promise.resolve();
+                    done();
+                    resolve();
+                } else {
+                    reject(new Error(ACCIDENT_ENTERED_DISABLED));
+                }
+            };
+
+            this.statusIgnoreCrashByDisabledCallback = callback;
+
+            this.events.one(CombinePlayerStatus.Disabled, callback);
         });
+    }
+
+    /**
+     * 取消对合法 Disable 状态的监听
+     * 因为某些合法 Disable 状态监听，是为了处理极端情况而出现的，在大部分的使用场景中，是不会触发的
+     */
+    public cancelOneButNotCrashByDisabled(): void {
+        this.events.removeListener(
+            CombinePlayerStatus.Disabled,
+            this.statusIgnoreCrashByDisabledCallback,
+        );
+        this.statusIgnoreCrashByDisabled = [];
+        // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+        this.statusIgnoreCrashByDisabledCallback = () => Promise.resolve();
     }
 
     /**
@@ -216,8 +241,6 @@ export class StateMachine {
                 // 当符合条件时解锁
                 if (this.statusLockInfo.unLockStatusList.includes(tableData.combineStatus)) {
                     this.unlockCombineStatus();
-                    // 当 当前上下文结束时，置空。防止干扰后续的上下文
-                    this.statusIgnoreCrashByDisabled = [];
                 }
 
                 this.dispatchEvent(tableData);
@@ -473,3 +496,9 @@ type OnStatusUpdate = ({
     previous: AtomPlayerStatusPair;
     current: AtomPlayerStatusPair;
 }) => Promise<void>;
+
+type Callback = (
+    previous: AtomPlayerStatusPair,
+    current: AtomPlayerStatusPair,
+    done: AnyFunction,
+) => Promise<void>;
