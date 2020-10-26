@@ -79,14 +79,9 @@ export class StateMachine {
         return this.on(CombinePlayerStatus.Disabled, async ({ current }) => {
             const { video: videoStatus, whiteboard: whiteboardStatus } = current;
 
-            // 当当前页面不在浏览器的Tab激活页时，而后又被激活，就会出现在这种情况。所以这里对其做了额外处理，认为是合法状态
-            const whiteboardBuffering =
-                whiteboardStatus === AtomPlayerStatus.PauseBuffering &&
-                videoStatus === AtomPlayerStatus.Playing;
-
             const flag = this.shouldCrash(videoStatus, whiteboardStatus);
 
-            if (flag && !whiteboardBuffering) {
+            if (flag) {
                 crashHandler();
             }
         });
