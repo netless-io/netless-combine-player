@@ -2,6 +2,7 @@
   "name": "netless-combine-player",
   "version": "0.0.1",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "repository": "git@github.com:netless-io/netless-combine-player.git",
   "author": "Black-Hole <158blackhole@gmail.com>",
   "license": "MIT",
