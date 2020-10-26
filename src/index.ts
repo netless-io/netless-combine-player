@@ -55,6 +55,10 @@ export default class CombinePlayerFactory {
         });
     }
 
+    public getVideoDOM(): HTMLVideoElement {
+        return this.videoOptions.videoDOM as HTMLVideoElement;
+    }
+
     /**
      * 设置 whiteboard 的相关回调
      * @param {EventEmitter} whiteboardEmitter - whiteboard 的 EventEmitter 对象
