@@ -2,7 +2,7 @@
 
 同步 video 和 白板回放 的项目
 
-[English Document](https://github.com/netless-io/netless-combine-player/blob/master/README-zh.md)
+[English Document](/README-zh.md)
 
 ## 使用
 
@@ -31,23 +31,23 @@ whiteWebSdk.replayRoom({ room, roomToken })
 
 ## API
 
-### [CombinePlayerFactory](https://github.com/netless-io/netless-combine-player/blob/27c3593dbf/src/index.ts#L8)
+### [CombinePlayerFactory](/src/index.ts#L8)
 
 ```typescript
 new CombinePlayerFactory(whiteboard, videoOptions, debug);
 ```
 
-#### [whiteboard](https://github.com/netless-io/netless-combine-player/blob/27c3593dbf/src/index.ts#L10)
+#### [whiteboard](/src/index.ts#L10)
 
 由 `replayRoom` 函数生成
 
 类型: [Player](https://developer.netless.link/javascript-zh/home/player-methods#player-%E7%9A%84%E5%AE%9A%E4%B9%89)
 
-#### [videoOptions](https://github.com/netless-io/netless-combine-player/blob/27c3593dbf/src/index.ts#L9)
+#### [videoOptions](/src/index.ts#L9)
 
 video 的配置项
 
-类型: [VideoOptions](https://github.com/netless-io/netless-combine-player/blob/27c3593dbfa244cb8f9c5ab8570726bf33852c45/src/Types.ts#L4-L11)
+类型: [VideoOptions](a244cb8f9c5ab8570726bf33852c45/src/Types.ts#L4-L11)
 
 **类型详情:**
 
@@ -67,7 +67,7 @@ videoOptions: {
 }
 ```
 
-#### [debug](https://github.com/netless-io/netless-combine-player/blob/27c3593dbf/src/index.ts#L11)
+#### [debug](/src/index.ts#L11)
 
 是否开启 debug 日志
 
@@ -87,7 +87,7 @@ whiteWebSdk.replayRoom({ room, roomToken })
     });
 ```
 
-### [combinePlayerFactory.create](https://github.com/netless-io/netless-combine-player/blob/27c3593dbf/src/index.ts#L39-L56)
+### [combinePlayerFactory.create](/src/index.ts#L39-L56)
 
 创建 `CombinePlayer` 实例，并返回
 
@@ -95,9 +95,9 @@ whiteWebSdk.replayRoom({ room, roomToken })
 const combinePlayer: CombinePlayer = combinePlayerFactory.create();
 ```
 
-返回类型: [CombinePlayer](https://github.com/netless-io/netless-combine-player/blob/27c3593dbf/src/Types.ts#L54-L60)
+返回类型: [CombinePlayer](/src/Types.ts#L54-L60)
 
-### [combinePlayerFactory.getVideoDOM](https://github.com/netless-io/netless-combine-player/blob/75593a6a19/src/index.ts#L58-L60)
+### [combinePlayerFactory.getVideoDOM](/src/index.ts#L58-L60)
 
 获取 video 的元素
 
@@ -109,7 +109,7 @@ const videoDOM: HTMLVideoElement = combinePlayerFactory.getVideoDOM();
 
 返回类型: `HTMLVideoElement`
 
-### [combinePlayer.setOnStatusChange](https://github.com/netless-io/netless-combine-player/blob/27c3593dbf/src/CombinePlayerImplement.ts#L55-L61)
+### [combinePlayer.setOnStatusChange](/src/CombinePlayerImplement.ts#L55-L61)
 
 注册一个回调函数，当状态发生改成时进行通知
 
@@ -117,9 +117,9 @@ const videoDOM: HTMLVideoElement = combinePlayerFactory.getVideoDOM();
 combinePlayer.setOnStatusChange(statusOnChange);
 ```
 
-#### [cb](https://github.com/netless-io/netless-combine-player/blob/27c3593dbf/src/CombinePlayerImplement.ts#L59)
+#### [cb](/src/CombinePlayerImplement.ts#L59)
 
-类型: [StatusChangeHandle](https://github.com/netless-io/netless-combine-player/blob/27c3593dbf/src/Types.ts#L52)
+类型: [StatusChangeHandle](/src/Types.ts#L52)
 
 #### **例子:**
 
@@ -130,7 +130,7 @@ const statusOnChange = (status: PublicCombinedStatus, message: string): void => 
 combinePlayer.setOnStatusChange(statusOnChange);
 ```
 
-### [combinePlayer.removeStatusChange](https://github.com/netless-io/netless-combine-player/blob/27c3593dbf/src/CombinePlayerImplement.ts#L63-L71)
+### [combinePlayer.removeStatusChange](/src/CombinePlayerImplement.ts#L63-L71)
 
 移除指定的状态通知回调
 
@@ -138,9 +138,9 @@ combinePlayer.setOnStatusChange(statusOnChange);
 combinePlayer.removeStatusChange(statusOnChange);
 ```
 
-#### [cb](https://github.com/netless-io/netless-combine-player/blob/27c3593dbf/src/CombinePlayerImplement.ts#L67)
+#### [cb](/src/CombinePlayerImplement.ts#L67)
 
-类型: [StatusChangeHandle](https://github.com/netless-io/netless-combine-player/blob/27c3593dbf/src/Types.ts#L52)
+类型: [StatusChangeHandle](/src/Types.ts#L52)
 
 #### **例子:**
 
@@ -153,7 +153,7 @@ combinePlayer.setOnStatusChange(statusOnChange);
 combinePlayer.removeStatusChange(statusOnChange);
 ```
 
-### [combinePlayer.removeAllStatusChange](https://github.com/netless-io/netless-combine-player/blob/27c3593dbf/src/CombinePlayerImplement.ts#L73-L78)
+### [combinePlayer.removeAllStatusChange](/src/CombinePlayerImplement.ts#L73-L78)
 
 删除所有的状态通知回调
 
@@ -161,7 +161,7 @@ combinePlayer.removeStatusChange(statusOnChange);
 combinePlayer.removeAllStatusChange();
 ```
 
-### [combinePlayer.getStatus](https://github.com/netless-io/netless-combine-player/blob/27c3593dbf/src/CombinePlayerImplement.ts#L80-L85)
+### [combinePlayer.getStatus](/src/CombinePlayerImplement.ts#L80-L85)
 
 主动获取当前的状态
 
@@ -169,9 +169,9 @@ combinePlayer.removeAllStatusChange();
 combinePlayer.getStatus()
 ```
 
-返回类型: [PublicCombinedStatus](https://github.com/netless-io/netless-combine-player/blob/27c3593dbf/src/Types.ts#L26-L34)
+返回类型: [PublicCombinedStatus](/src/Types.ts#L26-L34)
 
-### [combinePlayer.play](https://github.com/netless-io/netless-combine-player/blob/27c3593dbf/src/CombinePlayerImplement.ts#L90)
+### [combinePlayer.play](/src/CombinePlayerImplement.ts#L90)
 
 开始同步播放
 
@@ -185,7 +185,7 @@ combinePlayer.play();
 await combinePlayer.play();
 ```
 
-### [combinePlayer.pause](https://github.com/netless-io/netless-combine-player/blob/27c3593dbf/src/CombinePlayerImplement.ts#L140)
+### [combinePlayer.pause](/src/CombinePlayerImplement.ts#L140)
 
 暂停 `video` 和 `whiteboard`
 
@@ -199,7 +199,7 @@ combinePlayer.pause();
 await combinePlayer.pasue();
 ```
 
-### [combinePlayer.seek](https://github.com/netless-io/netless-combine-player/blob/27c3593dbf/src/CombinePlayerImplement.ts#L158)
+### [combinePlayer.seek](/src/CombinePlayerImplement.ts#L158)
 
 同步跳转到指定的毫秒时间戳
 
