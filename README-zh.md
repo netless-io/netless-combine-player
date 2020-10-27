@@ -1,4 +1,4 @@
-# netless-combine-player
+# @netless/combine-player
 
 同步 video 和 白板回放 的项目
 
@@ -7,7 +7,7 @@
 ## 使用
 
 ```typescript
-import CombinePlayerFactory from "netless-combine-player";
+import CombinePlayerFactory from "@netless/combine-player";
 
 whiteWebSdk.replayRoom({ room, roomToken })
     .then(async (player) => {
@@ -47,7 +47,7 @@ new CombinePlayerFactory(whiteboard, videoOptions, debug);
 
 video 的配置项
 
-类型: [VideoOptions](a244cb8f9c5ab8570726bf33852c45/src/Types.ts#L4-L11)
+类型: [VideoOptions](/src/Types.ts#L4-L11)
 
 **类型详情:**
 
