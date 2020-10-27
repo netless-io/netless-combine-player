@@ -1,4 +1,4 @@
-# netless-combine-player
+# @netless/combine-player
 
 Synchronize video and whiteboard playback projects
 
@@ -7,7 +7,7 @@ Synchronize video and whiteboard playback projects
 ## Usages
 
 ```typescript
-import CombinePlayerFactory from "netless-combine-player";
+import CombinePlayerFactory from "@netless/combine-player";
 
 whiteWebSdk.replayRoom({ room, roomToken })
     .then(async (player) => {
@@ -47,7 +47,7 @@ type: [Player](https://developer.netless.link/javascript-zh/home/player-methods#
 
 Video configuration items
 
-type: [VideoOptions](a244cb8f9c5ab8570726bf33852c45/src/Types.ts#L4-L11)
+type: [VideoOptions](/src/Types.ts#L4-L11)
 
 **Type Details:**
 
