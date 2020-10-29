@@ -37,7 +37,7 @@ export class StateMachine {
 
     private readonly debug: (...args: any[]) => void = () => {};
 
-    private statusIgnoreCrashByDisabled: AtomPlayerStatusPair[] = [];
+    private statusIgnoreCrashByDisabled: AtomPlayerStatusPair[][] = [];
     private statusIgnoreCrashByDisabledCallback: Callback = () => Promise.resolve();
 
     /**
@@ -104,7 +104,7 @@ export class StateMachine {
                 return reject(new Error(MONITOR_LEGAL_DISABLE_STATE_MULTIPLE_TIMES));
             }
 
-            this.statusIgnoreCrashByDisabled = statusIgnoreCrashByDisabled;
+            this.statusIgnoreCrashByDisabled.push(statusIgnoreCrashByDisabled);
 
             const callback: Callback = async (previous, current, done): Promise<void> => {
                 const whiteboardStatus = this.getStatus(AtomPlayerSource.Whiteboard).current;
@@ -113,18 +113,18 @@ export class StateMachine {
                 const flag = !this.shouldCrash(videoStatus, whiteboardStatus);
 
                 if (flag) {
+                    this.statusIgnoreCrashByDisabled = [];
+                    // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+                    this.statusIgnoreCrashByDisabledCallback = () => Promise.resolve();
+                    done();
+                    resolve();
+
                     if (cb) {
                         await cb({
                             previous,
                             current,
                         });
                     }
-
-                    this.statusIgnoreCrashByDisabled = [];
-                    // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-                    this.statusIgnoreCrashByDisabledCallback = () => Promise.resolve();
-                    done();
-                    resolve();
                 } else {
                     reject(new Error(ACCIDENT_ENTERED_DISABLED));
                 }
@@ -306,7 +306,7 @@ export class StateMachine {
     ): boolean {
         let foundAnyStatusMatches = false;
 
-        for (const { video, whiteboard } of this.statusIgnoreCrashByDisabled) {
+        for (const { video, whiteboard } of this.statusIgnoreCrashByDisabled[0]) {
             if (whiteboardStatus === whiteboard && video === videoStatus) {
                 foundAnyStatusMatches = true;
                 break;
