@@ -664,6 +664,7 @@ export class CombinePlayerImplement implements CombinePlayer {
             async () => {
                 this.onStatusUpdate(CombinePlayerStatus.Playing);
                 this.stateMachine.cancelOneButNotCrashByDisabled();
+                this.stateMachine.off([CombinePlayerStatus.ToPause, CombinePlayerStatus.ToPlay]);
                 this.video.off("playing", videoOnPlaying);
                 this.whiteboardEmitter.removeListener("playing", whiteboardOnPlaying);
             },
@@ -685,8 +686,7 @@ export class CombinePlayerImplement implements CombinePlayer {
         this.whiteboard.play();
 
         await Promise.all([
-            combinePlayerStatusWhenToPause,
-            combinePlayerStatusWhenToPlay,
+            Promise.race([combinePlayerStatusWhenToPause, combinePlayerStatusWhenToPlay]),
             combinePlayerStatusWhenPlaying,
         ]);
     }
