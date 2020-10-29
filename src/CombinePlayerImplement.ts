@@ -702,12 +702,16 @@ export class CombinePlayerImplement implements CombinePlayer {
             [CombinePlayerStatus.Pause],
         );
 
+        const whiteboardOnBuffering = (): void => {
+            this.stateMachine.setStatus(AtomPlayerSource.Whiteboard, AtomPlayerStatus.PauseSeeking);
+        };
+
         const whiteboardOnPause = (): void => {
             this.stateMachine.setStatus(AtomPlayerSource.Whiteboard, AtomPlayerStatus.Pause);
         };
 
-        const whiteboardOnPlaying = (): void => {
-            this.whiteboard.pause();
+        const videoOnSeeking = (): void => {
+            this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.PlayingSeeking);
         };
 
         const videoOnCanplay = (): void => {
@@ -721,10 +725,11 @@ export class CombinePlayerImplement implements CombinePlayer {
             },
         );
 
+        this.whiteboardEmitter.one("buffering", whiteboardOnBuffering);
         this.whiteboardEmitter.one("pause", whiteboardOnPause);
-        this.whiteboardEmitter.one("playing", whiteboardOnPlaying);
 
         this.video.one("canplay", videoOnCanplay);
+        this.video.one("seeking", videoOnSeeking);
 
         this.whiteboard.seekToProgressTime(0);
         this.video.currentTime(0);
