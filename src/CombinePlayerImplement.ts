@@ -371,11 +371,6 @@ export class CombinePlayerImplement implements CombinePlayer {
                 async (): Promise<void> => {
                     await this.taskQueue.append(
                         (): Promise<void> => {
-                            this.stateMachine.setStatus(
-                                AtomPlayerSource.Whiteboard,
-                                AtomPlayerStatus.PlayingBuffering,
-                            );
-                            this.onStatusUpdate(CombinePlayerStatus.PlayingBuffering);
                             return this.pauseVideoWhenWhiteboardBuffering();
                         },
                     );
@@ -710,8 +705,12 @@ export class CombinePlayerImplement implements CombinePlayer {
             this.stateMachine.setStatus(AtomPlayerSource.Whiteboard, AtomPlayerStatus.Pause);
         };
 
+        const whiteboardOnPlaying = (): void => {
+            this.whiteboard.pause();
+        };
+
         const videoOnSeeking = (): void => {
-            this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.PlayingSeeking);
+            this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.PauseSeeking);
         };
 
         const videoOnCanplay = (): void => {
@@ -721,12 +720,15 @@ export class CombinePlayerImplement implements CombinePlayer {
         const combinePlayerStatusWhenPause = this.stateMachine.one(
             CombinePlayerStatus.Pause,
             async () => {
+                this.whiteboardEmitter.removeListener("buffering", whiteboardOnBuffering);
+                this.whiteboardEmitter.removeListener("playing", whiteboardOnPlaying);
                 await this.playWhenPause();
             },
         );
 
         this.whiteboardEmitter.one("buffering", whiteboardOnBuffering);
         this.whiteboardEmitter.one("pause", whiteboardOnPause);
+        this.whiteboardEmitter.one("playing", whiteboardOnPlaying);
 
         this.video.one("canplay", videoOnCanplay);
         this.video.one("seeking", videoOnSeeking);
@@ -1148,6 +1150,9 @@ export class CombinePlayerImplement implements CombinePlayer {
      * @private
      */
     private async pauseVideoWhenWhiteboardBuffering(): Promise<void> {
+        this.stateMachine.setStatus(AtomPlayerSource.Whiteboard, AtomPlayerStatus.PlayingBuffering);
+        this.onStatusUpdate(CombinePlayerStatus.PlayingBuffering);
+
         // 当 video 处于 pause 状态时，再次调用 pause 方法时，是不会触发 pause 事件的。所以需要提前进行判断。
         if (this.video.paused()) {
             this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
@@ -1202,6 +1207,8 @@ export class CombinePlayerImplement implements CombinePlayer {
      * @private
      */
     private async pauseVideoWhenWhiteboardEnded(): Promise<void> {
+        this.stateMachine.setStatus(AtomPlayerSource.Whiteboard, AtomPlayerStatus.Ended);
+
         const combinePlayerStatusWhenEnded = this.stateMachine.one(
             CombinePlayerStatus.Ended,
             async () => {
@@ -1223,6 +1230,8 @@ export class CombinePlayerImplement implements CombinePlayer {
      * @private
      */
     private async pauseWhiteboardWhenVideoEnded(): Promise<void> {
+        this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Ended);
+
         const combinePlayerStatusWhenEnded = this.stateMachine.one(
             CombinePlayerStatus.Ended,
             async () => {
