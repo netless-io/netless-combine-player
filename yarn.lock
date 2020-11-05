@@ -878,10 +878,10 @@
     minimatch "^3.0.4"
     strip-json-comments "^3.1.1"
 
-"@netless/canvas-polyfill@^0.0.3":
-  version "0.0.3"
-  resolved "https://registry.npmjs.org/@netless/canvas-polyfill/-/canvas-polyfill-0.0.3.tgz#caf77b6b1b666db54cde5edda3751ee292bc088a"
-  integrity sha512-X3KodHfvMAIrmVBsj7kbWdcWA+eCr/uhqpix10GKXE+UovIyJd05KyFNMKIAXOMQI79NJrYiHcPBLszRRogygA==
+"@netless/canvas-polyfill@^0.0.4":
+  version "0.0.4"
+  resolved "https://registry.npmjs.org/@netless/canvas-polyfill/-/canvas-polyfill-0.0.4.tgz#b5f28eefeb9c1e8ff8253fa1b044ccb1dc1b7c9c"
+  integrity sha512-7NzsJrba0R/mq/l10SkIZQwbrNVJyPxZYrjK6xL3Ts732iWAVuS2UB0u3s6iGeUVcqV39A679yva8APWRl4M0A==
 
 "@netless/eslint-plugin@^1.0.0":
   version "1.0.0"
@@ -5165,7 +5165,7 @@ v8-compile-cache@^2.0.3, v8-compile-cache@^2.1.1:
   resolved "https://registry.npmjs.org/v8-compile-cache/-/v8-compile-cache-2.1.1.tgz#54bc3cdd43317bca91e35dcaf305b1a7237de745"
   integrity sha512-8OQ9CL+VWyt3JStj7HX7/ciTL2V3Rl1Wf5OL+SNTm0yK1KvtReVulksyeRnCANHHuUxHlQig+JJDlUhBt1NQDQ==
 
-"video.js@^6.8.0 || ^7.0.0", video.js@^7.4.0, video.js@^7.8.4:
+"video.js@^6.8.0 || ^7.0.0", video.js@^7.8.4:
   version "7.8.4"
   resolved "https://registry.npmjs.org/video.js/-/video.js-7.8.4.tgz#645bf40400b413047d2b873c0c65fc8b42128f2a"
   integrity sha512-XTWWrhfdrk7nTBkqhWKslfXMpUhsDRsZ2L3ISxjuAgadpiomxFV/OARchtwxO+FdnxTm4njJstPmXbVe3F765g==
@@ -5300,12 +5300,12 @@ which@^2.0.1:
   dependencies:
     isexe "^2.0.0"
 
-white-web-sdk@^2.9.16:
-  version "2.9.17"
-  resolved "https://registry.npmjs.org/white-web-sdk/-/white-web-sdk-2.9.17.tgz#d42312765322186d3a24e6fe68f59d01e8233195"
-  integrity sha512-KsHjV0uym6mBUSeeNbnt/EjHsWN4Uh/8ElnDeK+MirPqHbHWc7/NLzuVkKxntF/YhQ3CfuiCfOM3E80W8M0JyQ==
+white-web-sdk@^2.11.2:
+  version "2.11.2"
+  resolved "https://registry.npmjs.org/white-web-sdk/-/white-web-sdk-2.11.2.tgz#bc98167a781a7b365222195a807b1bc8c1ba9a43"
+  integrity sha512-BLiwSE2eqjWO706eCuGs1HOko1yPBgftgYEAanvk8NQ1t7VA+kdkTvFXnlT4Nc9rZ1/ECFYTcRp74OskbplZLQ==
   dependencies:
-    "@netless/canvas-polyfill" "^0.0.3"
+    "@netless/canvas-polyfill" "^0.0.4"
     atob "^2.1.0"
     bezier-js "^2.4.4"
     color "^3.1.0"
@@ -5321,7 +5321,6 @@ white-web-sdk@^2.9.16:
     textarea-caret-ts "^4.1.0"
     url-parse "^1.4.0"
     uuid "^7.0.3"
-    video.js "^7.4.0"
     xml-js "^1.6.11"
 
 wildcard@^2.0.0:
