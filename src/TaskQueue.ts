@@ -34,11 +34,13 @@ export class TaskQueue {
         try {
             this.isHanding = true;
             while (this.queue.length > 0) {
-                const taskNode = this.queue.shift()!;
+                const taskNode = this.queue[0];
                 try {
                     taskNode.resolve(await taskNode.handler());
                 } catch (error) {
                     taskNode.reject(error);
+                } finally {
+                    this.queue.shift()!;
                 }
             }
         } catch (error) {
