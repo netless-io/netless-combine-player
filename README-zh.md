@@ -95,7 +95,7 @@ whiteWebSdk.replayRoom({ room, roomToken })
 const combinePlayer: CombinePlayer = combinePlayerFactory.create();
 ```
 
-返回类型: [CombinePlayer](/src/Types.ts#L54-L60)
+返回类型: [CombinePlayer](/src/Types.ts#L54-L61)
 
 ### [combinePlayerFactory.getVideoDOM](/src/index.ts#L58-L60)
 
@@ -171,7 +171,23 @@ combinePlayer.getStatus()
 
 返回类型: [PublicCombinedStatus](/src/Types.ts#L26-L34)
 
-### [combinePlayer.play](/src/CombinePlayerImplement.ts#L90)
+### [combinePlayer.playbackSpeed](/src/CombinePlayerImplement.ts#L87-90)
+
+设置播放速率
+
+```typescript
+combinePlayer.playbackSpeed(rate)
+```
+
+返回类型: `void`
+
+#### **例子:**
+
+```typescript
+combinePlayer.playbackSpeed(2); // 开启二倍速
+```
+
+### [combinePlayer.play](/src/CombinePlayerImplement.ts#L95)
 
 开始同步播放
 
@@ -185,7 +201,7 @@ combinePlayer.play();
 await combinePlayer.play();
 ```
 
-### [combinePlayer.pause](/src/CombinePlayerImplement.ts#L140)
+### [combinePlayer.pause](/src/CombinePlayerImplement.ts#L145)
 
 暂停 `video` 和 `whiteboard`
 
@@ -199,7 +215,7 @@ combinePlayer.pause();
 await combinePlayer.pasue();
 ```
 
-### [combinePlayer.seek](/src/CombinePlayerImplement.ts#L158)
+### [combinePlayer.seek](/src/CombinePlayerImplement.ts#L163)
 
 同步跳转到指定的毫秒时间戳
 

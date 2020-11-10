@@ -87,7 +87,7 @@ whiteWebSdk.replayRoom({ room, roomToken })
     });
 ```
 
-### [combinePlayerFactory.create](/src/index.ts#L39-L56)
+### [combinePlayerFactory.create](/src/Types.ts#L54-L61)
 
 Create an instance of the CombinePlayer and return
 
@@ -171,7 +171,23 @@ combinePlayer.getStatus()
 
 return type: [PublicCombinedStatus](/src/Types.ts#L26-L34)
 
-### [combinePlayer.play](/src/CombinePlayerImplement.ts#L90)
+### [combinePlayer.playbackSpeed](/src/CombinePlayerImplement.ts#L87-90)
+
+set playback speed
+
+```typescript
+combinePlayer.playbackSpeed(rate)
+```
+
+return type: `void`
+
+#### **Example:**
+
+```typescript
+combinePlayer.playbackSpeed(2); // Turn on double speed
+```
+
+### [combinePlayer.play](/src/CombinePlayerImplement.ts#L95)
 
 Start synchronized playback
 
@@ -185,7 +201,7 @@ combinePlayer.play();
 await combinePlayer.play();
 ```
 
-### [combinePlayer.pause](/src/CombinePlayerImplement.ts#L140)
+### [combinePlayer.pause](/src/CombinePlayerImplement.ts#L145)
 
 Pause `video` and `whiteboard`
 
@@ -199,7 +215,7 @@ combinePlayer.pause();
 await combinePlayer.pasue();
 ```
 
-### [combinePlayer.seek](/src/CombinePlayerImplement.ts#L158)
+### [combinePlayer.seek](/src/CombinePlayerImplement.ts#L163)
 
 ```typescript
 combinePlayer.seek(ms)
