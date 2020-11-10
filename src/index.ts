@@ -88,3 +88,5 @@ export default class CombinePlayerFactory {
         };
     }
 }
+
+export * from "./Types";

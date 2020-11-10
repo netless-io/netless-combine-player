@@ -84,6 +84,11 @@ export class CombinePlayerImplement implements CombinePlayer {
         return this.currentCombineStatus;
     }
 
+    public playbackSpeed(rate: number): void {
+        this.whiteboard.playbackSpeed = rate;
+        this.video.playbackRate(rate);
+    }
+
     /**
      * 插件的播放处理
      */
