@@ -1208,6 +1208,12 @@ export class CombinePlayerImplement implements CombinePlayer {
      */
     private async pauseVideoWhenWhiteboardEnded(): Promise<void> {
         this.stateMachine.setStatus(AtomPlayerSource.Whiteboard, AtomPlayerStatus.Ended);
+        const videoStatus = this.stateMachine.getStatus(AtomPlayerSource.Video).current;
+
+        // 如果 video 已经是 ended 或者 pause 状态则不需要再进行暂停
+        if (videoStatus === AtomPlayerStatus.Ended || videoStatus === AtomPlayerStatus.Pause) {
+            return;
+        }
 
         const combinePlayerStatusWhenEnded = this.stateMachine.one(
             CombinePlayerStatus.Ended,
@@ -1231,6 +1237,15 @@ export class CombinePlayerImplement implements CombinePlayer {
      */
     private async pauseWhiteboardWhenVideoEnded(): Promise<void> {
         this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Ended);
+        const whiteboardStatus = this.stateMachine.getStatus(AtomPlayerSource.Whiteboard).current;
+
+        // 如果 whiteboard 已经是 ended 或者 pause 状态则不需要再进行暂停
+        if (
+            whiteboardStatus === AtomPlayerStatus.Ended ||
+            whiteboardStatus === AtomPlayerStatus.Pause
+        ) {
+            return;
+        }
 
         const combinePlayerStatusWhenEnded = this.stateMachine.one(
             CombinePlayerStatus.Ended,
