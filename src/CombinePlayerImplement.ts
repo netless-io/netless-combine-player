@@ -183,6 +183,7 @@ export class CombinePlayerImplement implements CombinePlayer {
                         const { video, whiteboard } = this.getPlayerDuration();
                         if (ms <= video && ms <= whiteboard) {
                             await this.seekWhenPause(ms);
+                            await this.playWhenPause();
                         }
 
                         break;
@@ -923,6 +924,10 @@ export class CombinePlayerImplement implements CombinePlayer {
             this.stateMachine.setStatus(AtomPlayerSource.Whiteboard, AtomPlayerStatus.Pause);
         };
 
+        const whiteboardOnPlaying = (): void => {
+            this.whiteboard.pause();
+        };
+
         const clearVideoAndWhiteboardEvents = (): void => {
             this.video.off("seeking", videoOnSeeking);
             this.video.off("seeked", videoOnSeeked);
@@ -947,6 +952,7 @@ export class CombinePlayerImplement implements CombinePlayer {
                 this.onStatusUpdate(CombinePlayerStatus.Pause);
                 this.stateMachine.cancelOneButNotCrashByDisabled();
                 this.stateMachine.off(CombinePlayerStatus.Ended);
+                this.whiteboardEmitter.removeListener("playing", whiteboardOnPlaying);
                 clearVideoAndWhiteboardEvents();
             },
         );
@@ -956,6 +962,9 @@ export class CombinePlayerImplement implements CombinePlayer {
         this.video.one("seeked", videoOnSeeked);
 
         this.whiteboardEmitter.one("buffering", whiteboardOnBuffering);
+
+        // 如果 whiteboard 处于 Ended 状态时，进行 seek，seek 完成后会到达 playing 状态，所以这里需要对其做出额外判断
+        this.whiteboardEmitter.one("playing", whiteboardOnPlaying);
 
         this.whiteboardEmitter.one("pause", whiteboardOnPause);
 
