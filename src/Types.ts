@@ -53,6 +53,7 @@ export type StatusChangeHandle = (status: PublicCombinedStatus, message?: string
 
 export interface CombinePlayer {
     setOnStatusChange(cb: StatusChangeHandle): void;
+    playbackSpeed(rate: number): void;
     getStatus(): PublicCombinedStatus;
     play(): void;
     pause(): void;
