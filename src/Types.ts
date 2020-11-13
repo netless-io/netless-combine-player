@@ -1,5 +1,5 @@
 import { VideoJsPlayerOptions } from "video.js";
-import { CombinePlayerStatus, AtomPlayerStatus } from "./StatusContant";
+import { CombinePlayerStatus, AtomPlayerStatus, PublicCombinedStatus } from "./StatusContant";
 
 export interface VideoOptions extends VideoDefaultOptions {
     readonly url: string;
@@ -22,16 +22,6 @@ export type AtomPlayerStatusCompose = {
 };
 
 export type AnyFunction = (...args: any[]) => any;
-
-export type PublicCombinedStatus =
-    | CombinePlayerStatus.PauseSeeking
-    | CombinePlayerStatus.PlayingSeeking
-    | CombinePlayerStatus.Pause
-    | CombinePlayerStatus.PauseBuffering
-    | CombinePlayerStatus.PlayingBuffering
-    | CombinePlayerStatus.Playing
-    | CombinePlayerStatus.Ended
-    | CombinePlayerStatus.Disabled;
 
 export type LockInfo = {
     isLocked: boolean;

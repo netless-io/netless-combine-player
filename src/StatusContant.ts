@@ -21,6 +21,17 @@ export enum CombinePlayerStatus {
     Ended = "Ended",
 }
 
+export enum PublicCombinedStatus {
+    PauseSeeking = CombinePlayerStatus.PauseSeeking,
+    PlayingSeeking = CombinePlayerStatus.PlayingSeeking,
+    Pause = CombinePlayerStatus.Pause,
+    PauseBuffering = CombinePlayerStatus.PauseBuffering,
+    PlayingBuffering = CombinePlayerStatus.PlayingBuffering,
+    Playing = CombinePlayerStatus.Playing,
+    Ended = CombinePlayerStatus.Ended,
+    Disabled = CombinePlayerStatus.Disabled,
+}
+
 export enum AtomPlayerSource {
     Video,
     Whiteboard,
