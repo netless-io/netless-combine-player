@@ -25,6 +25,8 @@ export class CombinePlayerImplement implements CombinePlayer {
     private readonly videoOptions: VideoOptions;
     private readonly stateMachine: StateMachine;
 
+    private _playbackRate: number = 1;
+
     private triggerSource: TriggerSource = TriggerSource.None;
 
     private currentCombineStatus: PublicCombinedStatus = PublicCombinedStatus.PauseBuffering;
@@ -85,8 +87,17 @@ export class CombinePlayerImplement implements CombinePlayer {
     }
 
     public playbackSpeed(rate: number): void {
+        this.playbackRate = rate;
+    }
+
+    public set playbackRate(rate: number) {
+        this._playbackRate = rate;
         this.whiteboard.playbackSpeed = rate;
         this.video.playbackRate(rate);
+    }
+
+    public get playbackRate(): number {
+        return this._playbackRate;
     }
 
     /**

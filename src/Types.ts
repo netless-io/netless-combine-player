@@ -43,8 +43,12 @@ export type StatusChangeHandle = (status: PublicCombinedStatus, message?: string
 
 export interface CombinePlayer {
     setOnStatusChange(cb: StatusChangeHandle): void;
-    playbackSpeed(rate: number): void;
     getStatus(): PublicCombinedStatus;
+    /**
+     * @deprecated Use playSeedRate
+     */
+    playbackSpeed(rate: number): void;
+    playbackRate: number;
     play(): void;
     pause(): void;
     seek(ms: number): void;
