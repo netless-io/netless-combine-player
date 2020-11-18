@@ -4,6 +4,7 @@ import { Player, PlayerPhase } from "white-web-sdk";
 import { EventEmitter } from "./EventEmitter";
 import { CombinePlayerImplement } from "./CombinePlayerImplement";
 import videojs from "video.js";
+import { VideoReadyState } from "./StatusContant";
 
 export default class CombinePlayerFactory {
     private readonly videoOptions: VideoOptions;
@@ -47,7 +48,7 @@ export default class CombinePlayerFactory {
             videoConfig: {
                 videoOptions: this.videoOptions,
                 video,
-                isCanplay: video.readyState() > 2,
+                isCanplay: video.readyState() > VideoReadyState.HAVE_CURRENT_DATA,
             },
             whiteboard: this.whiteboard,
             whiteboardEmitter,

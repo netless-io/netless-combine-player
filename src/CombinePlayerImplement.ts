@@ -14,6 +14,7 @@ import {
     CombinePlayerStatus,
     TriggerSource,
     PublicCombinedStatus,
+    VideoReadyState,
 } from "./StatusContant";
 import { EventEmitter } from "./EventEmitter";
 import { TaskQueue } from "./TaskQueue";
@@ -759,12 +760,12 @@ export class CombinePlayerImplement implements CombinePlayer {
                 this.video.pause();
             });
 
-            // 这也是 IOS Video 的 bug，当在 seeked 事件后去调用 play 时，video 事件是正确的，但是 video 却不会播放
+            // 这也是 iOS Video 的 bug，当在 seeked 事件后去调用 play 时，video 事件是正确的，但是 video 却不会播放
             // 需要先进行一次 play，然后再 pause，后面再去 play 时，就可以让 video 播放了
             this.video.play();
         };
 
-        // 这是 IOS Video 的 bug，在 ended 情况下进行 seek，是不会触发 seeked 事件的。
+        // 这是 iOS Video 的 bug，在 ended 情况下进行 seek，是不会触发 seeked 事件的。
         // 通过此方法和 videoOnPlay 形成的一个闭环，反复 play / pause，来让 seeked 事件显示出来
         const videoOnPause = (): void => {
             this.video.play();
@@ -778,7 +779,7 @@ export class CombinePlayerImplement implements CombinePlayer {
             this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.PauseSeeking);
 
             videoIsCanplayIntervalID = window.setInterval(() => {
-                if (this.video.readyState() >= 2) {
+                if (this.video.readyState() >= VideoReadyState.HAVE_CURRENT_DATA) {
                     clearInterval(videoIsCanplayIntervalID);
 
                     this.video.play();
@@ -891,9 +892,9 @@ export class CombinePlayerImplement implements CombinePlayer {
         const videoOnSeeking = (): void => {
             this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.PlayingSeeking);
 
-            // 这里使用 轮询的方式去检测当前是否处于 seeked 状态，因为在 IOS webview 容器内，当在 pause 状态进行 seek 时，是不会触发 seeked 事件的
+            // 这里使用 轮询的方式去检测当前是否处于 seeked 状态，因为在 iOS webview 容器内，当在 playing 状态进行 seek 时，是不会触发 seeked 事件的
             videoIsCanplayIntervalID = window.setInterval(() => {
-                if (this.video.readyState() >= 2) {
+                if (this.video.readyState() >= VideoReadyState.HAVE_CURRENT_DATA) {
                     clearInterval(videoIsCanplayIntervalID);
                     if (ms < playerDuration.video) {
                         this.video.pause();
@@ -982,9 +983,9 @@ export class CombinePlayerImplement implements CombinePlayer {
         const videoOnSeeking = (): void => {
             this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.PauseSeeking);
 
-            // 这里使用 轮询的方式去检测当前是否处于 seeked 状态，因为在 IOS webview 容器内，当在 pause 状态进行 seek 时，是不会触发 seeked 事件的
+            // 这里使用 轮询的方式去检测当前是否处于 seeked 状态，因为在 iOS webview 容器内，当在 pause 状态进行 seek 时，是不会触发 seeked 事件的
             videoIsCanplayIntervalID = window.setInterval(() => {
-                if (this.video.readyState() >= 2) {
+                if (this.video.readyState() >= VideoReadyState.HAVE_CURRENT_DATA) {
                     clearInterval(videoIsCanplayIntervalID);
                     this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
                 }
@@ -1062,9 +1063,9 @@ export class CombinePlayerImplement implements CombinePlayer {
         const videoOnSeeking = (): void => {
             this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.PauseSeeking);
 
-            // 这里使用 轮询的方式去检测当前是否处于 seeked 状态，因为在 IOS webview 容器内，当在 pause 状态进行 seek 时，是不会触发 seeked 事件的
+            // 这里使用 轮询的方式去检测当前是否处于 seeked 状态，因为在 iOS webview 容器内，当在 pause 状态进行 seek 时，是不会触发 seeked 事件的
             videoIsCanplayIntervalID = window.setInterval(() => {
-                if (this.video.readyState() >= 2) {
+                if (this.video.readyState() >= VideoReadyState.HAVE_CURRENT_DATA) {
                     clearInterval(videoIsCanplayIntervalID);
                     this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
 
