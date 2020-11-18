@@ -14,6 +14,7 @@ import {
     CombinePlayerStatus,
     TriggerSource,
     PublicCombinedStatus,
+    VideoReadyState,
 } from "./StatusContant";
 import { EventEmitter } from "./EventEmitter";
 import { TaskQueue } from "./TaskQueue";
@@ -26,6 +27,8 @@ export class CombinePlayerImplement implements CombinePlayer {
     private readonly stateMachine: StateMachine;
 
     private _playbackRate: number = 1;
+
+    private seekTime: number = NaN;
 
     private triggerSource: TriggerSource = TriggerSource.None;
 
@@ -104,7 +107,7 @@ export class CombinePlayerImplement implements CombinePlayer {
      * 插件的播放处理
      */
     public async play(): Promise<void> {
-        return this.taskQueue.append(
+        await this.taskQueue.append(
             async (): Promise<void> => {
                 this.triggerSource = TriggerSource.Plugin;
 
@@ -145,6 +148,11 @@ export class CombinePlayerImplement implements CombinePlayer {
                     }
                 }
 
+                if (!isNaN(this.seekTime)) {
+                    await this.seekWhenPlaying(this.seekTime);
+                    this.seekTime = NaN;
+                }
+
                 this.triggerSource = TriggerSource.None;
             },
         );
@@ -174,6 +182,17 @@ export class CombinePlayerImplement implements CombinePlayer {
     public async seek(ms: number): Promise<void> {
         return this.taskQueue.append(
             async (): Promise<void> => {
+                const whiteboardProgressTime = this.whiteboard.progressTime;
+                const videoProgressTime = this.video.currentTime();
+
+                // 当 两端的进度都 0 时，不进行 seek，留到下次用户调用 play 的时候 seek
+                if (whiteboardProgressTime === 0 && videoProgressTime === 0) {
+                    if (ms !== 0) {
+                        this.seekTime = ms;
+                    }
+                    return;
+                }
+
                 this.triggerSource = TriggerSource.Plugin;
 
                 const currentCombinedStatus = this.stateMachine.getCombinationStatus().current;
@@ -709,6 +728,9 @@ export class CombinePlayerImplement implements CombinePlayer {
      */
     private async playWhenEnded(): Promise<void> {
         this.onStatusUpdate(PublicCombinedStatus.PlayingBuffering);
+
+        let videoIsCanplayIntervalID = NaN;
+
         this.stateMachine.lockCombineStatus(
             [CombinePlayerStatus.Pause],
             [CombinePlayerStatus.Pause],
@@ -726,12 +748,43 @@ export class CombinePlayerImplement implements CombinePlayer {
             this.whiteboard.pause();
         };
 
-        const videoOnSeeking = (): void => {
-            this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.PauseSeeking);
+        const videoOnSeeked = (): void => {
+            this.video.off("pause", videoOnPause);
+            this.video.off("play", videoOnPlay);
+
+            this.video.one("play", () => {
+                this.video.one("pause", () => {
+                    this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
+                });
+
+                this.video.pause();
+            });
+
+            // 这也是 iOS Video 的 bug，当在 seeked 事件后去调用 play 时，video 事件是正确的，但是 video 却不会播放
+            // 需要先进行一次 play，然后再 pause，后面再去 play 时，就可以让 video 播放了
+            this.video.play();
         };
 
-        const videoOnCanplay = (): void => {
-            this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
+        // 这是 iOS Video 的 bug，在 ended 情况下进行 seek，是不会触发 seeked 事件的。
+        // 通过此方法和 videoOnPlay 形成的一个闭环，反复 play / pause，来让 seeked 事件显示出来
+        const videoOnPause = (): void => {
+            this.video.play();
+        };
+
+        const videoOnPlay = (): void => {
+            this.video.pause();
+        };
+
+        const videoOnSeeking = (): void => {
+            this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.PauseSeeking);
+
+            videoIsCanplayIntervalID = window.setInterval(() => {
+                if (this.video.readyState() >= VideoReadyState.HAVE_CURRENT_DATA) {
+                    clearInterval(videoIsCanplayIntervalID);
+
+                    this.video.play();
+                }
+            }, 500);
         };
 
         const combinePlayerStatusWhenPause = this.stateMachine.one(
@@ -739,6 +792,7 @@ export class CombinePlayerImplement implements CombinePlayer {
             async () => {
                 this.whiteboardEmitter.removeListener("buffering", whiteboardOnBuffering);
                 this.whiteboardEmitter.removeListener("playing", whiteboardOnPlaying);
+                clearInterval(videoIsCanplayIntervalID);
                 await this.playWhenPause();
             },
         );
@@ -747,8 +801,10 @@ export class CombinePlayerImplement implements CombinePlayer {
         this.whiteboardEmitter.one("pause", whiteboardOnPause);
         this.whiteboardEmitter.one("playing", whiteboardOnPlaying);
 
-        this.video.one("canplay", videoOnCanplay);
         this.video.one("seeking", videoOnSeeking);
+        this.video.one("seeked", videoOnSeeked);
+        this.video.on("play", videoOnPlay);
+        this.video.on("pause", videoOnPause);
 
         this.whiteboard.seekToProgressTime(0);
         this.video.currentTime(0);
@@ -799,6 +855,8 @@ export class CombinePlayerImplement implements CombinePlayer {
     private async seekWhenPlaying(ms: number): Promise<void> {
         this.onStatusUpdate(PublicCombinedStatus.PlayingSeeking);
 
+        let videoIsCanplayIntervalID = NaN;
+
         const playerDuration = this.getPlayerDuration();
 
         this.stateMachine.lockCombineStatus(
@@ -833,27 +891,28 @@ export class CombinePlayerImplement implements CombinePlayer {
 
         const videoOnSeeking = (): void => {
             this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.PlayingSeeking);
-        };
 
-        const videoOnSeeked = (): void => {
-            if (ms < playerDuration.video) {
-                this.video.pause();
-                this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
-            }
-        };
-
-        const videoOnEnded = (): void => {
-            this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Ended);
+            // 这里使用 轮询的方式去检测当前是否处于 seeked 状态，因为在 iOS webview 容器内，当在 playing 状态进行 seek 时，是不会触发 seeked 事件的
+            videoIsCanplayIntervalID = window.setInterval(() => {
+                if (this.video.readyState() >= VideoReadyState.HAVE_CURRENT_DATA) {
+                    clearInterval(videoIsCanplayIntervalID);
+                    if (ms < playerDuration.video) {
+                        this.video.pause();
+                        this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
+                    } else {
+                        this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Ended);
+                    }
+                }
+            }, 500);
         };
 
         const clearVideoAndWhiteboardEvents = (): void => {
+            clearInterval(videoIsCanplayIntervalID);
             this.whiteboardEmitter.removeListener("buffering", whiteboardOnBuffering);
             this.whiteboardEmitter.removeListener("pause", whiteboardOnPause);
             this.whiteboardEmitter.removeListener("playing", whiteboardOnPlaying);
             this.whiteboardEmitter.removeListener("ended", whiteboardOnEnded);
             this.video.off("seeking", videoOnSeeking);
-            this.video.off("seeked", videoOnSeeked);
-            this.video.off("ended", videoOnEnded);
         };
 
         const combinePlayerStatusWhenPlayingSeeking = this.stateMachine.one(
@@ -890,10 +949,6 @@ export class CombinePlayerImplement implements CombinePlayer {
 
         this.video.one("seeking", videoOnSeeking);
 
-        this.video.one("seeked", videoOnSeeked);
-
-        this.video.one("ended", videoOnEnded);
-
         this.whiteboardEmitter.one("buffering", whiteboardOnBuffering);
 
         this.whiteboardEmitter.one("pause", whiteboardOnPause);
@@ -918,6 +973,7 @@ export class CombinePlayerImplement implements CombinePlayer {
      */
     private async seekWhenPause(ms: number): Promise<void> {
         this.onStatusUpdate(PublicCombinedStatus.PauseSeeking);
+        let videoIsCanplayIntervalID = NaN;
 
         this.stateMachine.lockCombineStatus(
             [CombinePlayerStatus.Disabled, CombinePlayerStatus.Pause],
@@ -926,10 +982,14 @@ export class CombinePlayerImplement implements CombinePlayer {
 
         const videoOnSeeking = (): void => {
             this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.PauseSeeking);
-        };
 
-        const videoOnSeeked = (): void => {
-            this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
+            // 这里使用 轮询的方式去检测当前是否处于 seeked 状态，因为在 iOS webview 容器内，当在 pause 状态进行 seek 时，是不会触发 seeked 事件的
+            videoIsCanplayIntervalID = window.setInterval(() => {
+                if (this.video.readyState() >= VideoReadyState.HAVE_CURRENT_DATA) {
+                    clearInterval(videoIsCanplayIntervalID);
+                    this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
+                }
+            }, 500);
         };
 
         const whiteboardOnBuffering = (): void => {
@@ -945,8 +1005,8 @@ export class CombinePlayerImplement implements CombinePlayer {
         };
 
         const clearVideoAndWhiteboardEvents = (): void => {
+            clearInterval(videoIsCanplayIntervalID);
             this.video.off("seeking", videoOnSeeking);
-            this.video.off("seeked", videoOnSeeked);
             this.whiteboardEmitter.removeListener("buffering", whiteboardOnBuffering);
             this.whiteboardEmitter.removeListener("pause", whiteboardOnPause);
         };
@@ -975,8 +1035,6 @@ export class CombinePlayerImplement implements CombinePlayer {
 
         this.video.one("seeking", videoOnSeeking);
 
-        this.video.one("seeked", videoOnSeeked);
-
         this.whiteboardEmitter.one("buffering", whiteboardOnBuffering);
 
         // 如果 whiteboard 处于 Ended 状态时，进行 seek，seek 完成后会到达 playing 状态，所以这里需要对其做出额外判断
@@ -996,6 +1054,7 @@ export class CombinePlayerImplement implements CombinePlayer {
     ): Promise<void> {
         this.onStatusUpdate(PublicCombinedStatus.PauseSeeking);
 
+        let videoIsCanplayIntervalID = NaN;
         this.stateMachine.lockCombineStatus(
             [CombinePlayerStatus.Disabled, CombinePlayerStatus.Ended],
             [CombinePlayerStatus.Ended],
@@ -1003,16 +1062,18 @@ export class CombinePlayerImplement implements CombinePlayer {
 
         const videoOnSeeking = (): void => {
             this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.PauseSeeking);
-        };
 
-        const videoOnEnded = (): void => {
-            this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Ended);
-        };
+            // 这里使用 轮询的方式去检测当前是否处于 seeked 状态，因为在 iOS webview 容器内，当在 pause 状态进行 seek 时，是不会触发 seeked 事件的
+            videoIsCanplayIntervalID = window.setInterval(() => {
+                if (this.video.readyState() >= VideoReadyState.HAVE_CURRENT_DATA) {
+                    clearInterval(videoIsCanplayIntervalID);
+                    this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
 
-        const videoOnSeeked = (): void => {
-            if (ms < playerDuration.video) {
-                this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
-            }
+                    if (ms >= playerDuration.video) {
+                        this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Ended);
+                    }
+                }
+            }, 500);
         };
 
         const whiteboardOnPause = (): void => {
@@ -1030,9 +1091,8 @@ export class CombinePlayerImplement implements CombinePlayer {
         };
 
         const clearVideoAndWhiteboardEvents = (): void => {
+            clearInterval(videoIsCanplayIntervalID);
             this.video.off("seeking", videoOnSeeking);
-            this.video.off("ended", videoOnEnded);
-            this.video.off("seeked", videoOnSeeked);
             this.whiteboardEmitter.removeListener("buffering", whiteboardOnBuffering);
             this.whiteboardEmitter.removeListener("pause", whiteboardOnPause);
             this.whiteboardEmitter.removeListener("ended", whiteboardOnEnded);
@@ -1061,10 +1121,6 @@ export class CombinePlayerImplement implements CombinePlayer {
 
         this.video.one("seeking", videoOnSeeking);
 
-        this.video.one("seeked", videoOnSeeked);
-
-        this.video.one("ended", videoOnEnded);
-
         this.whiteboardEmitter.one("buffering", whiteboardOnBuffering);
 
         this.whiteboardEmitter.one("pause", whiteboardOnPause);
@@ -1073,14 +1129,6 @@ export class CombinePlayerImplement implements CombinePlayer {
 
         this.whiteboard.seekToProgressTime(ms);
         this.video.currentTime(ms / 1000);
-
-        // 这是一个 video 的 bug
-        // 当 video 处于 pause 状态时，我们 seek 到视频的终点时间戳时或者超过终点时间戳时，并不会去触发 Ended，需要等 seek 结束后，再进行一次 seek，才能正确触发 Ended 事件
-        if (ms >= playerDuration.video) {
-            this.video.one("seeked", (): void => {
-                this.video.currentTime(ms / 1000);
-            });
-        }
 
         await combinePlayerStatusWhenEnded;
     }
