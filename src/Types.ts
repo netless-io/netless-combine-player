@@ -43,6 +43,9 @@ export type StatusChangeHandle = (status: PublicCombinedStatus, message?: string
 
 export interface CombinePlayer {
     setOnStatusChange(cb: StatusChangeHandle): void;
+    removeStatusChange(cb: StatusChangeHandle): void;
+    removeAllStatusChange(): void;
+    stop(): void;
     getStatus(): PublicCombinedStatus;
     /**
      * @deprecated Use playSeedRate

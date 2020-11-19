@@ -12,13 +12,17 @@ import {
     AtomPlayerSource,
     AtomPlayerStatus,
     CombinePlayerStatus,
-    TriggerSource,
     PublicCombinedStatus,
+    TriggerSource,
     VideoReadyState,
 } from "./StatusContant";
 import { EventEmitter } from "./EventEmitter";
 import { TaskQueue } from "./TaskQueue";
-import { ACCIDENT_ENTERED_DISABLED } from "./ErrorConstant";
+import {
+    ACCIDENT_ENTERED_DISABLED,
+    COMBINE_PLAYER_DID_CRASH,
+    COMBINE_PLAYER_DID_STOP,
+} from "./ErrorConstant";
 
 export class CombinePlayerImplement implements CombinePlayer {
     private readonly video: VideoJsPlayer;
@@ -101,6 +105,19 @@ export class CombinePlayerImplement implements CombinePlayer {
 
     public get playbackRate(): number {
         return this._playbackRate;
+    }
+
+    public stop(): void {
+        if (this.currentCombineStatus === PublicCombinedStatus.Stopped) {
+            throw new Error(COMBINE_PLAYER_DID_STOP);
+        }
+
+        if (this.currentCombineStatus === PublicCombinedStatus.Disabled) {
+            throw new Error(COMBINE_PLAYER_DID_CRASH);
+        }
+
+        this.releaseEvents();
+        this.onStatusUpdate(PublicCombinedStatus.Stopped);
     }
 
     /**
@@ -1336,6 +1353,13 @@ export class CombinePlayerImplement implements CombinePlayer {
         await combinePlayerStatusWhenEnded;
     }
 
+    private releaseEvents(): void {
+        this.taskQueue.destroy();
+        this.stateMachine.destroy();
+        this.whiteboardEmitter.destroy();
+        this.video.off();
+    }
+
     /**
      * 意外进入 Disabled 状态处理
      * 在程序正常运行期间，是不应该走到 Disable 状态的，一旦走到说明程序出现了问题，需要对其做出 crash 的响应
@@ -1343,11 +1367,7 @@ export class CombinePlayerImplement implements CombinePlayer {
      */
     private async initOnCrashByDisabledStatusCallback(): Promise<void> {
         await this.stateMachine.setOnCrashByDisabledStatus(() => {
-            this.taskQueue.destroy();
-            this.stateMachine.destroy();
-            this.whiteboardEmitter.destroy();
-            this.triggerSource = TriggerSource.None;
-            this.video.off();
+            this.releaseEvents();
             this.onStatusUpdate(PublicCombinedStatus.Disabled, ACCIDENT_ENTERED_DISABLED);
         });
     }
@@ -1359,6 +1379,13 @@ export class CombinePlayerImplement implements CombinePlayer {
      * @private
      */
     private onStatusUpdate(status: PublicCombinedStatus, message?: string): void {
+        if (
+            this.currentCombineStatus === PublicCombinedStatus.Disabled ||
+            this.currentCombineStatus === PublicCombinedStatus.Stopped
+        ) {
+            return;
+        }
+
         if (this.currentCombineStatus !== status) {
             this.currentCombineStatus = status;
 
