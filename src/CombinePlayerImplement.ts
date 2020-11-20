@@ -1373,6 +1373,7 @@ export class CombinePlayerImplement implements CombinePlayer {
         this.taskQueue.destroy();
         this.stateMachine.destroy();
         this.whiteboardEmitter.destroy();
+        this.whiteboard.stop();
         this.video.off();
     }
 
