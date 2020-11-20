@@ -11,6 +11,12 @@ export interface VideoDefaultOptions {
     readonly videoJsOptions?: VideoJsPlayerOptions;
 }
 
+export interface TimeDuration {
+    readonly duration: number;
+    readonly video: number;
+    readonly whiteboard: number;
+}
+
 export type AtomPlayerStatusPair = {
     readonly whiteboard: AtomPlayerStatus;
     readonly video: AtomPlayerStatus;
@@ -53,6 +59,7 @@ export interface CombinePlayer {
      */
     playbackSpeed(rate: number): void;
     playbackRate: number;
+    readonly timeDuration: TimeDuration;
     play(): void;
     pause(): void;
     seek(ms: number): void;

@@ -5,6 +5,7 @@ import {
     AtomPlayerStatusCompose,
     CombinePlayer,
     StatusChangeHandle,
+    TimeDuration,
     VideoOptions,
 } from "./Types";
 import { StateMachine } from "./StateMachine";
@@ -109,6 +110,15 @@ export class CombinePlayerImplement implements CombinePlayer {
 
     public get playbackRate(): number {
         return this._playbackRate;
+    }
+
+    public get timeDuration(): TimeDuration {
+        const { video, whiteboard } = this.getPlayerDuration();
+        return {
+            duration: Math.min(video, whiteboard),
+            video,
+            whiteboard,
+        };
     }
 
     public stop(): void {
