@@ -3,6 +3,7 @@ import { CombinePlayerStatus, AtomPlayerStatus, PublicCombinedStatus } from "./S
 
 export interface VideoOptions extends VideoDefaultOptions {
     readonly url: string;
+    readonly videoElementID?: string;
 }
 
 export interface VideoDefaultOptions {
