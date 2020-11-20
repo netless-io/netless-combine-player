@@ -41,7 +41,7 @@ export default class CombinePlayerFactory {
         const whiteboardEmitter: EventEmitter = new EventEmitter();
         this.handleWhiteboardCallback(whiteboardEmitter);
 
-        const videoDOM = this.videoOptions.videoElementID || this.videoOptions.videoDOM;
+        const videoDOM = this.getVideoDOM();
 
         const video = videojs(videoDOM, this.videoOptions.videoJsOptions);
         video.src(this.videoOptions.url);
@@ -59,6 +59,10 @@ export default class CombinePlayerFactory {
     }
 
     public getVideoDOM(): HTMLVideoElement {
+        if (typeof this.videoOptions.videoElementID !== "undefined") {
+            return document.getElementById(this.videoOptions.videoElementID) as HTMLVideoElement;
+        }
+
         return this.videoOptions.videoDOM as HTMLVideoElement;
     }
 
