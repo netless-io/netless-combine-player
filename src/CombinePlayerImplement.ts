@@ -89,11 +89,21 @@ export class CombinePlayerImplement implements CombinePlayer {
 
     /**
      * 方便用户主动获取当前的状态
+     * @deprecated Use combinedStatus
+     * 此方法在 2.0.0 版本删除
      */
     public getStatus(): PublicCombinedStatus {
+        return this.combinedStatus;
+    }
+
+    public get combinedStatus(): PublicCombinedStatus {
         return this.currentCombineStatus;
     }
 
+    /**
+     * @deprecated Use playbackRate
+     * 此方法在 2.0.0 版本删除
+     */
     public playbackSpeed(rate: number): void {
         this.playbackRate = rate;
     }

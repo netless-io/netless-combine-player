@@ -52,7 +52,9 @@ export interface CombinePlayer {
     setOnStatusChange(cb: StatusChangeHandle): void;
     removeStatusChange(cb: StatusChangeHandle): void;
     removeAllStatusChange(): void;
-    stop(): void;
+    /**
+     * @deprecated Use combinedStatus
+     */
     getStatus(): PublicCombinedStatus;
     /**
      * @deprecated Use playSeedRate
@@ -60,7 +62,9 @@ export interface CombinePlayer {
     playbackSpeed(rate: number): void;
     playbackRate: number;
     readonly timeDuration: TimeDuration;
+    readonly combinedStatus: PublicCombinedStatus;
     play(): void;
     pause(): void;
     seek(ms: number): void;
+    stop(): void;
 }
