@@ -3,11 +3,18 @@ import { CombinePlayerStatus, AtomPlayerStatus, PublicCombinedStatus } from "./S
 
 export interface VideoOptions extends VideoDefaultOptions {
     readonly url: string;
+    readonly videoElementID?: string;
 }
 
 export interface VideoDefaultOptions {
     readonly videoDOM?: HTMLVideoElement;
     readonly videoJsOptions?: VideoJsPlayerOptions;
+}
+
+export interface TimeDuration {
+    readonly duration: number;
+    readonly video: number;
+    readonly whiteboard: number;
 }
 
 export type AtomPlayerStatusPair = {
@@ -43,13 +50,21 @@ export type StatusChangeHandle = (status: PublicCombinedStatus, message?: string
 
 export interface CombinePlayer {
     setOnStatusChange(cb: StatusChangeHandle): void;
+    removeStatusChange(cb: StatusChangeHandle): void;
+    removeAllStatusChange(): void;
+    /**
+     * @deprecated Use combinedStatus
+     */
     getStatus(): PublicCombinedStatus;
     /**
      * @deprecated Use playSeedRate
      */
     playbackSpeed(rate: number): void;
     playbackRate: number;
+    readonly timeDuration: TimeDuration;
+    readonly combinedStatus: PublicCombinedStatus;
     play(): void;
     pause(): void;
     seek(ms: number): void;
+    stop(): void;
 }

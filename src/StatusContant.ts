@@ -22,14 +22,15 @@ export enum CombinePlayerStatus {
 }
 
 export enum PublicCombinedStatus {
-    PauseSeeking = CombinePlayerStatus.PauseSeeking,
-    PlayingSeeking = CombinePlayerStatus.PlayingSeeking,
-    Pause = CombinePlayerStatus.Pause,
-    PauseBuffering = CombinePlayerStatus.PauseBuffering,
-    PlayingBuffering = CombinePlayerStatus.PlayingBuffering,
-    Playing = CombinePlayerStatus.Playing,
-    Ended = CombinePlayerStatus.Ended,
-    Disabled = CombinePlayerStatus.Disabled,
+    PauseSeeking = "PauseSeeking",
+    PlayingSeeking = "PlayingSeeking",
+    Pause = "Pause",
+    PauseBuffering = "PauseBuffering",
+    PlayingBuffering = "PlayingBuffering",
+    Playing = "Playing",
+    Ended = "Ended",
+    Disabled = "Disabled",
+    Stopped = "Stopped",
 }
 
 export enum AtomPlayerSource {

@@ -5,6 +5,7 @@ import {
     AtomPlayerStatusCompose,
     CombinePlayer,
     StatusChangeHandle,
+    TimeDuration,
     VideoOptions,
 } from "./Types";
 import { StateMachine } from "./StateMachine";
@@ -12,13 +13,17 @@ import {
     AtomPlayerSource,
     AtomPlayerStatus,
     CombinePlayerStatus,
-    TriggerSource,
     PublicCombinedStatus,
+    TriggerSource,
     VideoReadyState,
 } from "./StatusContant";
 import { EventEmitter } from "./EventEmitter";
 import { TaskQueue } from "./TaskQueue";
-import { ACCIDENT_ENTERED_DISABLED } from "./ErrorConstant";
+import {
+    ACCIDENT_ENTERED_DISABLED,
+    COMBINE_PLAYER_DID_CRASH,
+    COMBINE_PLAYER_DID_STOP,
+} from "./ErrorConstant";
 
 export class CombinePlayerImplement implements CombinePlayer {
     private readonly video: VideoJsPlayer;
@@ -84,16 +89,30 @@ export class CombinePlayerImplement implements CombinePlayer {
 
     /**
      * 方便用户主动获取当前的状态
+     * @deprecated Use combinedStatus
+     * 此方法在 2.0.0 版本删除
      */
     public getStatus(): PublicCombinedStatus {
+        return this.combinedStatus;
+    }
+
+    public get combinedStatus(): PublicCombinedStatus {
         return this.currentCombineStatus;
     }
 
+    /**
+     * @deprecated Use playbackRate
+     * 此方法在 2.0.0 版本删除
+     */
     public playbackSpeed(rate: number): void {
         this.playbackRate = rate;
     }
 
     public set playbackRate(rate: number) {
+        if (this.isNotResponse()) {
+            return;
+        }
+
         this._playbackRate = rate;
         this.whiteboard.playbackSpeed = rate;
         this.video.playbackRate(rate);
@@ -103,10 +122,36 @@ export class CombinePlayerImplement implements CombinePlayer {
         return this._playbackRate;
     }
 
+    public get timeDuration(): TimeDuration {
+        const { video, whiteboard } = this.getPlayerDuration();
+        return {
+            duration: Math.min(video, whiteboard),
+            video,
+            whiteboard,
+        };
+    }
+
+    public stop(): void {
+        if (this.currentCombineStatus === PublicCombinedStatus.Stopped) {
+            throw new Error(COMBINE_PLAYER_DID_STOP);
+        }
+
+        if (this.currentCombineStatus === PublicCombinedStatus.Disabled) {
+            throw new Error(COMBINE_PLAYER_DID_CRASH);
+        }
+
+        this.releaseEvents();
+        this.onStatusUpdate(PublicCombinedStatus.Stopped);
+    }
+
     /**
      * 插件的播放处理
      */
     public async play(): Promise<void> {
+        if (this.isNotResponse()) {
+            return;
+        }
+
         await this.taskQueue.append(
             async (): Promise<void> => {
                 this.triggerSource = TriggerSource.Plugin;
@@ -162,6 +207,10 @@ export class CombinePlayerImplement implements CombinePlayer {
      * 插件的暂停处理
      */
     public async pause(): Promise<void> {
+        if (this.isNotResponse()) {
+            return;
+        }
+
         return this.taskQueue.append(
             async (): Promise<void> => {
                 this.triggerSource = TriggerSource.Plugin;
@@ -180,6 +229,10 @@ export class CombinePlayerImplement implements CombinePlayer {
      * 用户调用 seek 时的处理
      */
     public async seek(ms: number): Promise<void> {
+        if (this.isNotResponse()) {
+            return;
+        }
+
         return this.taskQueue.append(
             async (): Promise<void> => {
                 const whiteboardProgressTime = this.whiteboard.progressTime;
@@ -1336,6 +1389,14 @@ export class CombinePlayerImplement implements CombinePlayer {
         await combinePlayerStatusWhenEnded;
     }
 
+    private releaseEvents(): void {
+        this.taskQueue.destroy();
+        this.stateMachine.destroy();
+        this.whiteboardEmitter.destroy();
+        this.whiteboard.stop();
+        this.video.off();
+    }
+
     /**
      * 意外进入 Disabled 状态处理
      * 在程序正常运行期间，是不应该走到 Disable 状态的，一旦走到说明程序出现了问题，需要对其做出 crash 的响应
@@ -1343,11 +1404,7 @@ export class CombinePlayerImplement implements CombinePlayer {
      */
     private async initOnCrashByDisabledStatusCallback(): Promise<void> {
         await this.stateMachine.setOnCrashByDisabledStatus(() => {
-            this.taskQueue.destroy();
-            this.stateMachine.destroy();
-            this.whiteboardEmitter.destroy();
-            this.triggerSource = TriggerSource.None;
-            this.video.off();
+            this.releaseEvents();
             this.onStatusUpdate(PublicCombinedStatus.Disabled, ACCIDENT_ENTERED_DISABLED);
         });
     }
@@ -1359,6 +1416,10 @@ export class CombinePlayerImplement implements CombinePlayer {
      * @private
      */
     private onStatusUpdate(status: PublicCombinedStatus, message?: string): void {
+        if (this.isNotResponse()) {
+            return;
+        }
+
         if (this.currentCombineStatus !== status) {
             this.currentCombineStatus = status;
 
@@ -1383,6 +1444,19 @@ export class CombinePlayerImplement implements CombinePlayer {
             whiteboard: this.whiteboard.timeDuration,
             video: this.video.duration() * 1000,
         };
+    }
+
+    private isNotResponse(): boolean {
+        const result =
+            this.currentCombineStatus === PublicCombinedStatus.Stopped ||
+            this.currentCombineStatus === PublicCombinedStatus.Disabled;
+
+        if (result) {
+            console.warn(
+                `Currently in the ${this.currentCombineStatus} stage, the program will not respond to the current behavior`,
+            );
+        }
+        return result;
     }
 }
 

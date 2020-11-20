@@ -20,7 +20,7 @@ export default class CombinePlayerFactory {
     public constructor(whiteboard: Player, videoOptions: VideoOptions, debug: boolean = false) {
         verifyInstanceParams(videoOptions);
 
-        const _videoDefaultOptions = CombinePlayerFactory.videoDefaultOptions();
+        const _videoDefaultOptions = CombinePlayerFactory.videoDefaultOptions(videoOptions);
         this.videoOptions = {
             ..._videoDefaultOptions,
             ...videoOptions,
@@ -41,7 +41,9 @@ export default class CombinePlayerFactory {
         const whiteboardEmitter: EventEmitter = new EventEmitter();
         this.handleWhiteboardCallback(whiteboardEmitter);
 
-        const video = videojs(this.videoOptions.videoDOM, this.videoOptions.videoJsOptions);
+        const videoDOM = this.getVideoDOM();
+
+        const video = videojs(videoDOM, this.videoOptions.videoJsOptions);
         video.src(this.videoOptions.url);
 
         return new CombinePlayerImplement({
@@ -57,6 +59,10 @@ export default class CombinePlayerFactory {
     }
 
     public getVideoDOM(): HTMLVideoElement {
+        if (typeof this.videoOptions.videoElementID !== "undefined") {
+            return document.getElementById(this.videoOptions.videoElementID) as HTMLVideoElement;
+        }
+
         return this.videoOptions.videoDOM as HTMLVideoElement;
     }
 
@@ -80,15 +86,24 @@ export default class CombinePlayerFactory {
     /**
      * 实例化时默认的 video 传参
      */
-    private static videoDefaultOptions(): VideoDefaultOptions {
-        return {
-            videoDOM: document.createElement("video"),
+    private static videoDefaultOptions(videoOptions: VideoOptions): VideoDefaultOptions {
+        const result: Writeable<VideoDefaultOptions> = {
             videoJsOptions: {
                 preload: "auto",
             },
         };
+
+        if (!videoOptions.videoDOM && !videoOptions.videoElementID) {
+            result.videoDOM = document.createElement("video");
+        }
+
+        return result;
     }
 }
+
+type Writeable<T> = {
+    -readonly [P in keyof T]: T[P];
+};
 
 export * from "./Types";
 
