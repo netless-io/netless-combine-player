@@ -1447,10 +1447,16 @@ export class CombinePlayerImplement implements CombinePlayer {
     }
 
     private isNotResponse(): boolean {
-        return (
+        const result =
             this.currentCombineStatus === PublicCombinedStatus.Stopped ||
-            this.currentCombineStatus === PublicCombinedStatus.Disabled
-        );
+            this.currentCombineStatus === PublicCombinedStatus.Disabled;
+
+        if (result) {
+            console.warn(
+                `Currently in the ${this.currentCombineStatus} stage, the program will not respond to the current behavior`,
+            );
+        }
+        return result;
     }
 }
 
