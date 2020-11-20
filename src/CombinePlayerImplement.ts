@@ -98,6 +98,10 @@ export class CombinePlayerImplement implements CombinePlayer {
     }
 
     public set playbackRate(rate: number) {
+        if (this.isNotResponse()) {
+            return;
+        }
+
         this._playbackRate = rate;
         this.whiteboard.playbackSpeed = rate;
         this.video.playbackRate(rate);
@@ -124,6 +128,10 @@ export class CombinePlayerImplement implements CombinePlayer {
      * 插件的播放处理
      */
     public async play(): Promise<void> {
+        if (this.isNotResponse()) {
+            return;
+        }
+
         await this.taskQueue.append(
             async (): Promise<void> => {
                 this.triggerSource = TriggerSource.Plugin;
@@ -179,6 +187,10 @@ export class CombinePlayerImplement implements CombinePlayer {
      * 插件的暂停处理
      */
     public async pause(): Promise<void> {
+        if (this.isNotResponse()) {
+            return;
+        }
+
         return this.taskQueue.append(
             async (): Promise<void> => {
                 this.triggerSource = TriggerSource.Plugin;
@@ -197,6 +209,10 @@ export class CombinePlayerImplement implements CombinePlayer {
      * 用户调用 seek 时的处理
      */
     public async seek(ms: number): Promise<void> {
+        if (this.isNotResponse()) {
+            return;
+        }
+
         return this.taskQueue.append(
             async (): Promise<void> => {
                 const whiteboardProgressTime = this.whiteboard.progressTime;
@@ -1379,10 +1395,7 @@ export class CombinePlayerImplement implements CombinePlayer {
      * @private
      */
     private onStatusUpdate(status: PublicCombinedStatus, message?: string): void {
-        if (
-            this.currentCombineStatus === PublicCombinedStatus.Disabled ||
-            this.currentCombineStatus === PublicCombinedStatus.Stopped
-        ) {
+        if (this.isNotResponse()) {
             return;
         }
 
@@ -1410,6 +1423,13 @@ export class CombinePlayerImplement implements CombinePlayer {
             whiteboard: this.whiteboard.timeDuration,
             video: this.video.duration() * 1000,
         };
+    }
+
+    private isNotResponse(): boolean {
+        return (
+            this.currentCombineStatus === PublicCombinedStatus.Stopped ||
+            this.currentCombineStatus === PublicCombinedStatus.Disabled
+        );
     }
 }
 
