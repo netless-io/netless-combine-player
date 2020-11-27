@@ -751,6 +751,7 @@ export class CombinePlayerImplement implements CombinePlayer {
                 this.stateMachine.off([CombinePlayerStatus.ToPause, CombinePlayerStatus.ToPlay]);
                 this.video.off("playing", videoOnPlaying);
                 this.whiteboardEmitter.removeListener("playing", whiteboardOnPlaying);
+                this.whiteboardEmitter.removeListener("pause", whiteboardOnPause);
             },
         );
 
