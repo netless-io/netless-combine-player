@@ -263,6 +263,7 @@ export class CombinePlayerImplement implements CombinePlayer {
                             await this.seekWhenPauseFinallyIsEnded(ms, playerDuration);
                         } else {
                             await this.seekWhenPause(ms);
+                            await this.playWhenPause();
                         }
 
                         break;
