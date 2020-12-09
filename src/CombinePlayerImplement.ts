@@ -400,6 +400,46 @@ export class CombinePlayerImplement implements CombinePlayer {
                 },
             ),
         );
+
+        // 在 iOS Safari 中，如果 video 退出了全屏，则会自动暂停，导致影响到程序的正常逻辑，这里为 patch 代码
+        this.video.on(
+            "fullscreenchange",
+            warp(
+                async (): Promise<void> => {
+                    await this.taskQueue.append((): void => {
+                        const { current } = this.stateMachine.getStatus(AtomPlayerSource.Video);
+
+                        // 只对 video 在 playing 或者 playingBuffering 状态时做出处理
+                        if (
+                            current === AtomPlayerStatus.Playing ||
+                            current === AtomPlayerStatus.PlayingBuffering
+                        ) {
+                            // 如果当前是退出全屏，且暂停状态是由 iOS Safari 触发的
+                            // 这里为了保持和 iOS Safari 行为一致，把两端都进行暂停。因为在这里触发 play 是没有用的，需要等待几百毫秒才可以。
+                            // 这里暂停后，可以让用户手动点击 播放按钮，进行播放，在这期间其时间差已经超过了 1s，所以再去点击播放的时候，就没有问题了
+                            if (!this.video.isFullscreen() && this.video.paused()) {
+                                this.whiteboardEmitter.one("pause", () => {
+                                    this.stateMachine.setStatus(
+                                        AtomPlayerSource.Whiteboard,
+                                        AtomPlayerStatus.Pause,
+                                    );
+                                    this.stateMachine.setStatus(
+                                        AtomPlayerSource.Video,
+                                        AtomPlayerStatus.Pause,
+                                    );
+
+                                    this.onStatusUpdate(PublicCombinedStatus.Pause);
+                                });
+
+                                this.whiteboard.pause();
+                            }
+                        }
+
+                        this.triggerSource = TriggerSource.None;
+                    });
+                },
+            ),
+        );
     }
 
     /**
