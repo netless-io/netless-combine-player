@@ -156,6 +156,13 @@ export class CombinePlayerImplement implements CombinePlayer {
             async (): Promise<void> => {
                 this.triggerSource = TriggerSource.Plugin;
 
+                const videoCanAutoPlay = await this.checkVideoAutoPlay();
+                if (!videoCanAutoPlay) {
+                    console.error("[Combine-Player]: does not support auto play");
+                    this.triggerSource = TriggerSource.None;
+                    return;
+                }
+
                 const currentCombinedStatus = this.stateMachine.getCombinationStatus().current;
 
                 switch (currentCombinedStatus) {
@@ -1498,6 +1505,82 @@ export class CombinePlayerImplement implements CombinePlayer {
             );
         }
         return result;
+    }
+
+    private async checkVideoAutoPlay(): Promise<boolean> {
+        if (this.whiteboard.progressTime !== 0 || this.video.currentTime() !== 0) {
+            return true;
+        }
+
+        const videoStatus = this.stateMachine.getStatus(AtomPlayerSource.Video).current;
+        const whiteboardStatus = this.stateMachine.getStatus(AtomPlayerSource.Whiteboard).current;
+
+        const allowStatus = [AtomPlayerStatus.Pause, AtomPlayerStatus.PauseBuffering];
+
+        if (!allowStatus.includes(videoStatus) || !allowStatus.includes(whiteboardStatus)) {
+            return true;
+        }
+
+        this.stateMachine
+            .oneButNotCrashByDisabled([
+                {
+                    video: AtomPlayerStatus.Playing,
+                    whiteboard: AtomPlayerStatus.PauseBuffering,
+                },
+            ])
+            .catch(e => {
+                throw new Error(e);
+            });
+
+        const videoOnPlay = (): void => {
+            this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Playing);
+        };
+
+        const videoOnPause = (): void => {
+            this.stateMachine.setStatus(AtomPlayerSource.Video, AtomPlayerStatus.Pause);
+        };
+
+        const combinePlayerStatusWhenToPlay = this.stateMachine.one(
+            CombinePlayerStatus.ToPlay,
+            async () => {
+                this.video.pause();
+            },
+        );
+
+        const combinePlayerStatusWhenToPause = this.stateMachine.one(CombinePlayerStatus.Pause);
+        const combinePlayerStatusWhenToPauseBuffering = this.stateMachine.one(
+            CombinePlayerStatus.PauseBuffering,
+        );
+
+        this.video.one("play", videoOnPlay);
+        this.video.one("pause", videoOnPause);
+
+        const clearVideoAndWhiteboardEvents = (): void => {
+            this.stateMachine.cancelOneButNotCrashByDisabled();
+            this.video.off("play", videoOnPlay);
+            this.video.off("pause", videoOnPause);
+            this.stateMachine.off([
+                CombinePlayerStatus.ToPlay,
+                CombinePlayerStatus.Pause,
+                CombinePlayerStatus.PauseBuffering,
+            ]);
+        };
+
+        try {
+            await this.video.play();
+        } catch (e) {
+            clearVideoAndWhiteboardEvents();
+            return false;
+        }
+
+        await Promise.all([
+            combinePlayerStatusWhenToPlay,
+            Promise.race([combinePlayerStatusWhenToPause, combinePlayerStatusWhenToPauseBuffering]),
+        ]);
+
+        clearVideoAndWhiteboardEvents();
+
+        return true;
     }
 }
 
