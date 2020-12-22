@@ -42,6 +42,7 @@ export default class CombinePlayerFactory {
         this.handleWhiteboardCallback(whiteboardEmitter);
 
         const videoDOM = this.getVideoDOM();
+        CombinePlayerFactory.setAdditionalVideoAttr(videoDOM);
 
         const video = videojs(videoDOM, this.videoOptions.videoJsOptions);
         video.src(this.videoOptions.url);
@@ -98,6 +99,11 @@ export default class CombinePlayerFactory {
         }
 
         return result;
+    }
+
+    private static setAdditionalVideoAttr(video: HTMLVideoElement): void {
+        video.setAttribute("playsInline", "true");
+        video.setAttribute("webkit-playsinline", "true");
     }
 }
 
