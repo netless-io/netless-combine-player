@@ -43,9 +43,11 @@ export default class CombinePlayerFactory {
 
         const videoDOM = this.getVideoDOM();
 
-        const video = videojs(videoDOM, this.videoOptions.videoJsOptions);
+        const video = videojs(videoDOM, this.videoOptions.videoJsOptions, ()=> {
+            video.playsinline(this.videoOptions.playsinline ?? true);
+        });
         video.src(this.videoOptions.url);
-
+        
         return new CombinePlayerImplement({
             videoConfig: {
                 videoOptions: this.videoOptions,

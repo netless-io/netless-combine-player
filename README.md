@@ -180,6 +180,7 @@ interface VideoOptions {
     readonly videoElementID?: string;
     readonly videoDOM?: HTMLVideoElement;
     readonly videoJsOptions?: VideoJsPlayerOptions;
+    readonly playsinline?: boolean;
 }
 ```
 
