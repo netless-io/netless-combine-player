@@ -883,6 +883,9 @@ export class CombinePlayerImplement implements CombinePlayer {
                 if (this.video.readyState() >= VideoReadyState.HAVE_CURRENT_DATA) {
                     clearInterval(videoIsCanplayIntervalID);
 
+                    this.video.one("playing", () => {
+                        this.video.pause();
+                    });
                     this.video.play();
                 }
             }, 500);
@@ -891,9 +894,14 @@ export class CombinePlayerImplement implements CombinePlayer {
         const combinePlayerStatusWhenPause = this.stateMachine.one(
             CombinePlayerStatus.Pause,
             async () => {
+                clearInterval(videoIsCanplayIntervalID);
                 this.whiteboardEmitter.removeListener("buffering", whiteboardOnBuffering);
                 this.whiteboardEmitter.removeListener("playing", whiteboardOnPlaying);
-                clearInterval(videoIsCanplayIntervalID);
+                this.whiteboardEmitter.removeListener("pause", whiteboardOnPause);
+                this.video.off("seeking", videoOnSeeking);
+                this.video.off("seeked", videoOnSeeked);
+                this.video.off("play", videoOnPlay);
+                this.video.off("pause", videoOnPause);
                 await this.playWhenPause();
             },
         );
